@@ -122,15 +122,6 @@ export const DeviceDiscovery: React.FC = () => {
     setIsPairing(true);
 
     try {
-      // Check if user is authenticated first
-      const token = localStorage.getItem("auth_token");
-      if (!token) {
-        console.log(
-          "⚠️ User not authenticated, falling back to manual pairing"
-        );
-        throw new Error("Please log in to pair devices");
-      }
-
       // For local network devices, we can get the pairing code from the device
       const pairingInfo =
         await DevicesService.devicesControllerGetDevicePairingInfo(device.id);
@@ -148,6 +139,13 @@ export const DeviceDiscovery: React.FC = () => {
 
       console.log("✅ Device pairing successful!");
       showToast(`Successfully paired ${device.name}!`, "success");
+
+      // Ensure pairing alert is completely reset
+      setPairingAlert({
+        isOpen: false,
+        device: null,
+        pairingCode: "",
+      });
 
       // Refresh the device list
       setTimeout(() => {
@@ -472,8 +470,6 @@ export const DeviceDiscovery: React.FC = () => {
               value: pairingAlert.pairingCode,
               attributes: {
                 maxlength: 6,
-                style:
-                  "text-transform: uppercase; text-align: center; font-size: 18px; letter-spacing: 2px;",
               },
             },
           ]}
