@@ -180,20 +180,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         "../services/openapi/services/AuthenticationService"
       );
       const registerDto = { email, password, displayName };
+
+      // Get user agent for device tracking
+      const userAgent = navigator.userAgent || "PalPalette-App";
+
       const data = await AuthenticationService.authControllerRegister(
+        userAgent,
         registerDto
       );
 
-      // Note: Registration endpoint might not return the same structure as login
-      // We'll need to handle this based on the actual API response
+      // Now registration returns the same structure as login
       const { access_token, refresh_token, user: userData } = data;
 
       if (userData && userData.id && userData.email && userData.displayName) {
         await SecureStorageService.storeTokens(access_token, refresh_token);
-        await SecureStorageService.storeUser(userData);
+
+        // Map the API response to our User interface
+        const user: User = {
+          id: userData.id,
+          email: userData.email,
+          displayName: userData.displayName,
+        };
+
+        await SecureStorageService.storeUser(
+          user as unknown as Record<string, unknown>
+        );
         setToken(access_token);
         setRefreshToken(refresh_token);
-        setUser(userData);
+        setUser(user);
         console.log("✅ Registration successful");
         return true;
       } else {
