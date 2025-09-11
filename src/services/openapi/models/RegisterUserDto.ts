@@ -15,5 +15,9 @@ export type RegisterUserDto = {
      * Display name for the user
      */
     displayName: string;
+    /**
+     * Optional device name for tracking user sessions
+     */
+    device_name?: string;
 };
 

@@ -13,16 +13,21 @@ import { request as __request } from '../core/request';
 export class AuthenticationService {
     /**
      * Register a new user
+     * @param userAgent
      * @param requestBody
-     * @returns any User successfully registered
+     * @returns AuthResponseDto User successfully registered and logged in
      * @throws ApiError
      */
     public static authControllerRegister(
+        userAgent: string,
         requestBody: RegisterUserDto,
-    ): CancelablePromise<any> {
+    ): CancelablePromise<AuthResponseDto> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/auth/register',
+            headers: {
+                'user-agent': userAgent,
+            },
             body: requestBody,
             mediaType: 'application/json',
             errors: {
