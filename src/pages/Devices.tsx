@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useHistory } from "react-router-dom";
 import {
   IonContent,
@@ -54,9 +54,10 @@ const Devices: React.FC = () => {
   const [authNotificationDevice, setAuthNotificationDevice] =
     useState<Device | null>(null);
 
-  useEffect(() => {
-    refreshDevices();
-  }, [refreshDevices]);
+  // Remove the automatic refreshDevices call since DeviceProvider auto-fetches
+  // useEffect(() => {
+  //   refreshDevices();
+  // }, [refreshDevices]);
 
   const handleRefresh = async (event: CustomEvent) => {
     await refreshDevices();
