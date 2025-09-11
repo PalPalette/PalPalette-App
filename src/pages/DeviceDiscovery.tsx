@@ -469,7 +469,7 @@ export const DeviceDiscovery: React.FC = () => {
               placeholder: "Enter 6-character code",
               value: pairingAlert.pairingCode,
               attributes: {
-                maxlength: 6,
+                maxLength: 6,
               },
             },
           ]}
