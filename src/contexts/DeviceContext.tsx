@@ -1,4 +1,11 @@
-import React, { createContext, useState, ReactNode, useCallback } from "react";
+import React, {
+  createContext,
+  useState,
+  ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+} from "react";
 import { Device } from "../services/openapi/models/Device";
 import { DevicesService } from "../services/openapi/services/DevicesService";
 import { ClaimByCodeDto } from "../services/openapi/models/ClaimByCodeDto";
@@ -28,20 +35,43 @@ interface DeviceProviderProps {
 export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(false);
-  const { token } = useAuth();
+  const { token, isAuthenticated } = useAuth();
+  const fetchInProgressRef = useRef(false);
+  const hasInitializedRef = useRef(false);
 
   const refreshDevices = useCallback(async () => {
-    if (!token) return;
+    if (!token || !isAuthenticated || fetchInProgressRef.current) {
+      console.log("🚫 Skipping device fetch:", {
+        hasToken: !!token,
+        isAuthenticated,
+        fetchInProgress: fetchInProgressRef.current,
+      });
+      return;
+    }
+
     try {
+      fetchInProgressRef.current = true;
       setLoading(true);
+      console.log("🔄 Fetching devices from API...");
       const devicesData = await DevicesService.devicesControllerGetMyDevices();
       setDevices(devicesData as Device[]);
+      console.log(`✅ Fetched ${devicesData.length} devices`);
     } catch (error) {
       console.error("Failed to refresh devices:", error);
     } finally {
       setLoading(false);
+      fetchInProgressRef.current = false;
     }
-  }, [token]);
+  }, [token, isAuthenticated]);
+
+  // Auto-fetch devices when user becomes authenticated (only once)
+  useEffect(() => {
+    if (isAuthenticated && token && !hasInitializedRef.current) {
+      console.log("🚀 Auto-fetching devices on auth...");
+      hasInitializedRef.current = true;
+      refreshDevices();
+    }
+  }, [isAuthenticated, token, refreshDevices]);
 
   const claimDeviceByCode = useCallback(
     async (pairingCode: string, name: string): Promise<boolean> => {
@@ -92,6 +122,7 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
   };
 
   // TODO: Refactor sendColorToDevice to use generated service if available
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const sendColorToDevice = (deviceId: string, color: string) => {
     // Implement using DevicesService if endpoint exists
     console.warn("sendColorToDevice not yet refactored to OpenAPI");
