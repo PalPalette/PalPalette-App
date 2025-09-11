@@ -150,7 +150,7 @@ export class UserNotificationService {
 
     // Call registered callback for this device
     const callback = this.notificationCallbacks.get(deviceId);
-    if (callback) {
+    if (typeof callback === "function") {
       callback(notification);
     }
 
