@@ -78,7 +78,7 @@ const LightingConfigModal: React.FC<LightingConfigModalProps> = ({
   const [currentStatus, setCurrentStatus] =
     useState<LightingSystemStatus | null>(null);
   const [config, setConfig] = useState<LightingSystemConfig>({
-    lightingSystemType: LightingSystemConfigDto.lightingSystemType.WS2812,
+    lightingSystemType: LightingSystemConfigDto.lightingSystemType.NANOLEAF,
     lightingHostAddress: "",
     lightingPort: 80,
     lightingAuthToken: "",

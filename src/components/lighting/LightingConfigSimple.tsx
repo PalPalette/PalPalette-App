@@ -10,7 +10,6 @@ import {
   IonLabel,
   IonSelect,
   IonSelectOption,
-  IonInput,
   IonList,
   IonButtons,
   IonIcon,
@@ -45,10 +44,6 @@ const LightingConfigSimple: React.FC<LightingConfigSimpleProps> = ({
   const [systemType, setSystemType] = useState<
     LightingSystemConfigDto.lightingSystemType | ""
   >("");
-  const [ipAddress, setIpAddress] = useState("");
-  const [port, setPort] = useState("80");
-  const [ledPin, setLedPin] = useState("2"); // Default GPIO pin for WS2812
-  const [ledCount, setLedCount] = useState("30"); // Default LED count
   const [loading, setLoading] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [showAlert, setShowAlert] = useState(false);
@@ -60,10 +55,6 @@ const LightingConfigSimple: React.FC<LightingConfigSimpleProps> = ({
 
   const resetForm = () => {
     setSystemType("");
-    setIpAddress("");
-    setPort("80");
-    setLedPin("2");
-    setLedCount("30");
   };
 
   useEffect(() => {
@@ -80,16 +71,8 @@ const LightingConfigSimple: React.FC<LightingConfigSimpleProps> = ({
   const isFormValid = () => {
     if (!systemType) return false;
 
-    switch (systemType) {
-      case "nanoleaf":
-        return true; // Nanoleaf uses automatic discovery
-      case "wled":
-        return ipAddress.length > 0; // WLED requires IP address
-      case "ws2812":
-        return true; // WS2812 basic config
-      default:
-        return false;
-    }
+    // Only Nanoleaf is supported
+    return systemType === "nanoleaf";
   };
 
   const buildConfiguration = (): LightingSystemConfig => {
@@ -98,17 +81,6 @@ const LightingConfigSimple: React.FC<LightingConfigSimpleProps> = ({
         systemType as LightingSystemConfigDto.lightingSystemType,
     };
 
-    if (systemType === "wled") {
-      // WLED requires network configuration
-      config.lightingHostAddress = ipAddress;
-      config.lightingPort = parseInt(port) || 80;
-    } else if (systemType === "ws2812") {
-      // WS2812 requires hardware configuration
-      config.lightingCustomConfig = {
-        ledPin: parseInt(ledPin) || 2,
-        ledCount: parseInt(ledCount) || 30,
-      };
-    }
     // Nanoleaf uses auto-discovery, no additional config needed
 
     return config;
@@ -200,31 +172,17 @@ const LightingConfigSimple: React.FC<LightingConfigSimpleProps> = ({
   const getSystemDescription = (
     type: LightingSystemConfigDto.lightingSystemType
   ) => {
-    switch (type) {
-      case "nanoleaf":
-        return "Nanoleaf panels with automatic discovery and authentication";
-      case "wled":
-        return "WLED-compatible LED strips";
-      case "ws2812":
-        return "Direct WS2812 LED control";
-      default:
-        return "";
-    }
+    // Only Nanoleaf is supported
+    return type === "nanoleaf"
+      ? "Nanoleaf panels with automatic discovery and authentication"
+      : "";
   };
 
   const getRequiredFields = (
     type: LightingSystemConfigDto.lightingSystemType
   ) => {
-    switch (type) {
-      case "nanoleaf":
-        return ["Automatic discovery"]; // No manual fields needed
-      case "wled":
-        return ["IP Address"];
-      case "ws2812":
-        return ["IP Address"];
-      default:
-        return [];
-    }
+    // Only Nanoleaf is supported
+    return type === "nanoleaf" ? ["Automatic discovery"] : [];
   };
 
   return (
@@ -255,8 +213,6 @@ const LightingConfigSimple: React.FC<LightingConfigSimpleProps> = ({
                 onIonChange={(e) => setSystemType(e.detail.value)}
               >
                 <IonSelectOption value="nanoleaf">Nanoleaf</IonSelectOption>
-                <IonSelectOption value="wled">WLED</IonSelectOption>
-                <IonSelectOption value="ws2812">WS2812</IonSelectOption>
               </IonSelect>
               {systemType && (
                 <IonNote>
@@ -283,69 +239,6 @@ const LightingConfigSimple: React.FC<LightingConfigSimpleProps> = ({
                       </IonNote>
                     </IonLabel>
                   </IonItem>
-                )}
-
-                {systemType === "wled" && (
-                  <>
-                    <IonItem>
-                      <IonLabel position="stacked">IP Address *</IonLabel>
-                      <IonInput
-                        value={ipAddress}
-                        placeholder="192.168.1.100"
-                        onIonInput={(e) => setIpAddress(e.detail.value!)}
-                      />
-                    </IonItem>
-
-                    <IonItem>
-                      <IonLabel position="stacked">Port</IonLabel>
-                      <IonInput
-                        value={port}
-                        placeholder="80"
-                        type="number"
-                        onIonInput={(e) => setPort(e.detail.value!)}
-                      />
-                    </IonItem>
-                  </>
-                )}
-
-                {systemType === "ws2812" && (
-                  <>
-                    <IonItem>
-                      <IonLabel>
-                        <h3>⚡ Direct Connection</h3>
-                        <p>
-                          LED strip will be connected directly to the ESP32.
-                          Configure the GPIO pin and number of LEDs.
-                        </p>
-                      </IonLabel>
-                    </IonItem>
-
-                    <IonItem>
-                      <IonLabel position="stacked">GPIO Pin</IonLabel>
-                      <IonInput
-                        value={ledPin}
-                        placeholder="2"
-                        type="number"
-                        min="0"
-                        max="39"
-                        onIonInput={(e) => setLedPin(e.detail.value!)}
-                      />
-                      <IonNote>Default: Pin 2</IonNote>
-                    </IonItem>
-
-                    <IonItem>
-                      <IonLabel position="stacked">Number of LEDs</IonLabel>
-                      <IonInput
-                        value={ledCount}
-                        placeholder="30"
-                        type="number"
-                        min="1"
-                        max="1000"
-                        onIonInput={(e) => setLedCount(e.detail.value!)}
-                      />
-                      <IonNote>Default: 30 LEDs</IonNote>
-                    </IonItem>
-                  </>
                 )}
 
                 <IonItem>
