@@ -85,14 +85,6 @@ const Devices: React.FC = () => {
     setSelectedDevice(null);
   };
 
-  const handleStartLightingAuth = (device: Device) => {
-    setAuthNotificationDevice(device);
-    setShowAuthNotification(true);
-    // Close any other modals
-    setShowLightingModal(false);
-    setSelectedDevice(null);
-  };
-
   const handleAuthSuccess = () => {
     refreshDevices(); // Refresh to get updated lighting status
   };

@@ -37,11 +37,10 @@ import { SetupWizardModal } from "../components/devices";
 import { LightingSystemCard } from "../components/lighting";
 import { LightingConfigSimple } from "../components/lighting";
 import { DeviceAuthNotification } from "../components/notifications";
-import { useDeviceNotifications } from "../hooks/useDeviceNotifications";
 
 const DevicesWithLighting: React.FC = () => {
   const { devices, loading, refreshDevices, resetDevice } = useDevices();
-  const { authenticatingDevices } = useDeviceNotifications();
+
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [showPairingModal, setShowPairingModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -80,14 +79,6 @@ const DevicesWithLighting: React.FC = () => {
   const handleDeviceReset = async (deviceId: string) => {
     await resetDevice(deviceId);
     setShowSettingsModal(false);
-    setSelectedDevice(null);
-  };
-
-  const handleStartLightingAuth = (device: Device) => {
-    setAuthNotificationDevice(device);
-    setShowAuthNotification(true);
-    // Close any other modals
-    setShowLightingModal(false);
     setSelectedDevice(null);
   };
 
@@ -213,7 +204,8 @@ const DevicesWithLighting: React.FC = () => {
             <IonCardTitle>No Devices Found</IonCardTitle>
           </IonCardHeader>
           <IonCardContent>
-            You haven't paired any devices yet. Add devices to configure their lighting systems.
+            You haven't paired any devices yet. Add devices to configure their
+            lighting systems.
           </IonCardContent>
         </IonCard>
       ) : (

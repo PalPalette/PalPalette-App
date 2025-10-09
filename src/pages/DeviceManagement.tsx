@@ -40,7 +40,6 @@ import {
 import { DeviceAuthNotification } from "../components/notifications";
 import { useDeviceManagement } from "../hooks/device";
 import { useWebSocket } from "../hooks";
-import { DeviceStatusEvent } from "../services/WebSocketService";
 
 interface DeviceManagementProps {
   defaultView?: "devices" | "lighting" | "both";
@@ -239,7 +238,8 @@ const DeviceManagement: React.FC<DeviceManagementProps> = ({
             <IonCardTitle>No Devices Found</IonCardTitle>
           </IonCardHeader>
           <IonCardContent>
-            You haven't paired any devices yet. Add devices to configure their lighting systems.
+            You haven't paired any devices yet. Add devices to configure their
+            lighting systems.
           </IonCardContent>
         </IonCard>
       ) : (

@@ -181,44 +181,6 @@ export const DeviceDiscovery: React.FC = () => {
     }
   };
 
-  const completePairing = async () => {
-    if (!pairingAlert.device || !pairingAlert.pairingCode.trim()) {
-      showToast("Please enter a valid pairing code", "warning");
-      return;
-    }
-
-    setIsPairing(true);
-    try {
-      console.log(`🔗 Attempting to pair device: ${pairingAlert.device.name}`);
-
-      await DevicesService.devicesControllerClaimByCode({
-        pairingCode: pairingAlert.pairingCode.trim().toUpperCase(),
-        deviceName: pairingAlert.device.name,
-      });
-
-      // Success!
-      setPairingAlert({ isOpen: false, device: null, pairingCode: "" });
-      showToast(`Successfully paired ${pairingAlert.device.name}!`, "success");
-
-      // Refresh the device list in the DeviceContext
-      await refreshDevices();
-
-      // Navigate back to devices tab after successful pairing
-      setTimeout(() => {
-        history.push("/devices");
-      }, 1500); // Give user time to see the success message
-    } catch (error: unknown) {
-      console.error("Pairing failed:", error);
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Pairing failed. Please check the code and try again.";
-      showToast(errorMessage, "danger");
-    } finally {
-      setIsPairing(false);
-    }
-  };
-
   const handleRefresh = async (event: CustomEvent<RefresherEventDetail>) => {
     await scanForDevices();
     event.detail.complete();
