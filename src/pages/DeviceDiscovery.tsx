@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useHistory } from "react-router-dom";
 import {
   IonPage,
   IonHeader,
@@ -37,6 +38,7 @@ import {
 import { DevicesService } from "../services/openapi/services/DevicesService";
 import type { Device } from "../services/openapi/models/Device";
 import { RefresherEventDetail } from "@ionic/core";
+import { useDevices } from "../hooks/useContexts";
 
 interface PairingAlert {
   isOpen: boolean;
@@ -45,6 +47,8 @@ interface PairingAlert {
 }
 
 export const DeviceDiscovery: React.FC = () => {
+  const history = useHistory();
+  const { refreshDevices } = useDevices();
   const [devices, setDevices] = useState<Device[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [isPairing, setIsPairing] = useState(false);
@@ -147,10 +151,13 @@ export const DeviceDiscovery: React.FC = () => {
         pairingCode: "",
       });
 
-      // Refresh the device list
+      // Refresh the device list in the DeviceContext
+      await refreshDevices();
+
+      // Navigate back to devices tab after successful pairing
       setTimeout(() => {
-        scanForDevices();
-      }, 1000);
+        history.push("/devices");
+      }, 1500); // Give user time to see the success message
     } catch (error: unknown) {
       console.error("Auto-pairing failed:", error);
 
@@ -169,41 +176,6 @@ export const DeviceDiscovery: React.FC = () => {
         device,
         pairingCode: "",
       });
-    } finally {
-      setIsPairing(false);
-    }
-  };
-
-  const completePairing = async () => {
-    if (!pairingAlert.device || !pairingAlert.pairingCode.trim()) {
-      showToast("Please enter a valid pairing code", "warning");
-      return;
-    }
-
-    setIsPairing(true);
-    try {
-      console.log(`🔗 Attempting to pair device: ${pairingAlert.device.name}`);
-
-      await DevicesService.devicesControllerClaimByCode({
-        pairingCode: pairingAlert.pairingCode.trim().toUpperCase(),
-        deviceName: pairingAlert.device.name,
-      });
-
-      // Success!
-      setPairingAlert({ isOpen: false, device: null, pairingCode: "" });
-      showToast(`Successfully paired ${pairingAlert.device.name}!`, "success");
-
-      // Refresh the device list to remove the paired device
-      setTimeout(() => {
-        scanForDevices();
-      }, 1000);
-    } catch (error: unknown) {
-      console.error("Pairing failed:", error);
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Pairing failed. Please check the code and try again.";
-      showToast(errorMessage, "danger");
     } finally {
       setIsPairing(false);
     }
@@ -508,10 +480,13 @@ export const DeviceDiscovery: React.FC = () => {
                     "success"
                   );
 
-                  // Refresh the device list
+                  // Refresh the device list in the DeviceContext
+                  await refreshDevices();
+
+                  // Navigate back to devices tab after successful pairing
                   setTimeout(() => {
-                    scanForDevices();
-                  }, 1000);
+                    history.push("/devices");
+                  }, 1500); // Give user time to see the success message
                   return true; // Close the alert
                 } catch (error: unknown) {
                   console.error("Pairing failed:", error);

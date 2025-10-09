@@ -122,16 +122,8 @@ const LightingSystemCard: React.FC<LightingSystemCardProps> = memo(
     };
 
     const getSystemIcon = (systemType?: string) => {
-      switch (systemType) {
-        case "nanoleaf":
-          return bulb;
-        case "wled":
-          return flash;
-        case "ws2812":
-          return flash;
-        default:
-          return bulb;
-      }
+      // Only Nanoleaf is supported
+      return bulb;
     };
 
     if (loading && !status) {
@@ -212,16 +204,6 @@ const LightingSystemCard: React.FC<LightingSystemCardProps> = memo(
                 )}
 
                 <div style={{ display: "flex", gap: "8px", marginTop: "1rem" }}>
-                  {status.lightingSystemType !== "nanoleaf" && (
-                    <IonButton
-                      fill="outline"
-                      size="small"
-                      onClick={handleTest}
-                      disabled={loading}
-                    >
-                      {loading ? <IonSpinner name="crescent" /> : "Test"}
-                    </IonButton>
-                  )}
                   <IonButton
                     fill="outline"
                     size="small"

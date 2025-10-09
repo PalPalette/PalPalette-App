@@ -40,7 +40,6 @@ import {
 import { DeviceAuthNotification } from "../components/notifications";
 import { useDeviceManagement } from "../hooks/device";
 import { useWebSocket } from "../hooks";
-import { DeviceStatusEvent } from "../services/WebSocketService";
 
 interface DeviceManagementProps {
   defaultView?: "devices" | "lighting" | "both";
@@ -156,15 +155,13 @@ const DeviceManagement: React.FC<DeviceManagementProps> = ({
                 </IonChip>
               </div>
               <div style={{ display: "flex", gap: "8px" }}>
-                {device.isProvisioned && (
-                  <IonButton
-                    fill="clear"
-                    size="small"
-                    onClick={() => handleLightingConfig(device)}
-                  >
-                    <IonIcon icon={bulb} />
-                  </IonButton>
-                )}
+                <IonButton
+                  fill="clear"
+                  size="small"
+                  onClick={() => handleLightingConfig(device)}
+                >
+                  <IonIcon icon={bulb} />
+                </IonButton>
                 <IonButton
                   fill="clear"
                   size="small"
@@ -215,23 +212,19 @@ const DeviceManagement: React.FC<DeviceManagementProps> = ({
               </IonLabel>
             </IonItem>
 
-            {/* Lighting System Integration */}
-            {device.isProvisioned && (
-              <IonItem lines="none">
-                <IonLabel>
-                  <h3>Lighting System</h3>
-                </IonLabel>
-              </IonItem>
-            )}
+            {/* Lighting System Integration - Always show for claimed devices */}
+            <IonItem lines="none">
+              <IonLabel>
+                <h3>Lighting System</h3>
+              </IonLabel>
+            </IonItem>
           </IonList>
 
-          {/* Add lighting system card for configured devices */}
-          {device.isProvisioned && (
-            <LightingSystemCard
-              deviceId={device.id}
-              onConfigureClick={() => handleLightingConfig(device)}
-            />
-          )}
+          {/* Add lighting system card for all claimed devices */}
+          <LightingSystemCard
+            deviceId={device.id}
+            onConfigureClick={() => handleLightingConfig(device)}
+          />
         </IonCardContent>
       </IonCard>
     );
@@ -239,32 +232,31 @@ const DeviceManagement: React.FC<DeviceManagementProps> = ({
 
   const LightingOverview: React.FC = () => (
     <div>
-      {devices.filter((d) => d.isProvisioned).length === 0 ? (
+      {devices.length === 0 ? (
         <IonCard>
           <IonCardHeader>
-            <IonCardTitle>No Configured Devices</IonCardTitle>
+            <IonCardTitle>No Devices Found</IonCardTitle>
           </IonCardHeader>
           <IonCardContent>
-            Configure your devices first, then set up their lighting systems.
+            You haven't paired any devices yet. Add devices to configure their
+            lighting systems.
           </IonCardContent>
         </IonCard>
       ) : (
         <>
-          {devices
-            .filter((device) => device.isProvisioned)
-            .map((device) => (
-              <IonCard key={device.id}>
-                <IonCardHeader>
-                  <IonCardTitle>{device.name} - Lighting</IonCardTitle>
-                </IonCardHeader>
-                <IonCardContent>
-                  <LightingSystemCard
-                    deviceId={device.id}
-                    onConfigureClick={() => handleLightingConfig(device)}
-                  />
-                </IonCardContent>
-              </IonCard>
-            ))}
+          {devices.map((device) => (
+            <IonCard key={device.id}>
+              <IonCardHeader>
+                <IonCardTitle>{device.name} - Lighting</IonCardTitle>
+              </IonCardHeader>
+              <IonCardContent>
+                <LightingSystemCard
+                  deviceId={device.id}
+                  onConfigureClick={() => handleLightingConfig(device)}
+                />
+              </IonCardContent>
+            </IonCard>
+          ))}
         </>
       )}
     </div>

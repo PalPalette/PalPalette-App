@@ -178,16 +178,10 @@ export class LightingSystemService {
    * Get display name for lighting system type
    */
   static getLightingSystemDisplayName(systemType: string): string {
-    switch (systemType) {
-      case "nanoleaf":
-        return "Nanoleaf Panels";
-      case "wled":
-        return "WLED LED Strips";
-      case "ws2812":
-        return "WS2812B LED Strip";
-      default:
-        return systemType.toUpperCase();
-    }
+    // Only Nanoleaf is supported
+    return systemType === "nanoleaf"
+      ? "Nanoleaf Panels"
+      : systemType.toUpperCase();
   }
 
   /**

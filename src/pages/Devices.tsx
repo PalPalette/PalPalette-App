@@ -85,14 +85,6 @@ const Devices: React.FC = () => {
     setSelectedDevice(null);
   };
 
-  const handleStartLightingAuth = (device: Device) => {
-    setAuthNotificationDevice(device);
-    setShowAuthNotification(true);
-    // Close any other modals
-    setShowLightingModal(false);
-    setSelectedDevice(null);
-  };
-
   const handleAuthSuccess = () => {
     refreshDevices(); // Refresh to get updated lighting status
   };
@@ -139,15 +131,13 @@ const Devices: React.FC = () => {
               </IonChip>
             </div>
             <div style={{ display: "flex", gap: "8px" }}>
-              {device.isProvisioned && (
-                <IonButton
-                  fill="clear"
-                  size="small"
-                  onClick={() => handleLightingConfig(device)}
-                >
-                  <IonIcon icon={bulb} />
-                </IonButton>
-              )}
+              <IonButton
+                fill="clear"
+                size="small"
+                onClick={() => handleLightingConfig(device)}
+              >
+                <IonIcon icon={bulb} />
+              </IonButton>
               <IonButton
                 fill="clear"
                 size="small"
@@ -197,15 +187,13 @@ const Devices: React.FC = () => {
           </IonItem>
         </IonList>
 
-        {/* Add lighting system card for configured devices */}
-        {device.isProvisioned && (
-          <div style={{ marginTop: "16px" }}>
-            <LightingSystemCard
-              deviceId={device.id}
-              onConfigureClick={() => handleLightingConfig(device)}
-            />
-          </div>
-        )}
+        {/* Add lighting system card for all claimed devices */}
+        <div style={{ marginTop: "16px" }}>
+          <LightingSystemCard
+            deviceId={device.id}
+            onConfigureClick={() => handleLightingConfig(device)}
+          />
+        </div>
       </IonCardContent>
     </IonCard>
   );
