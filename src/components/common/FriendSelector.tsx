@@ -43,7 +43,8 @@ export const FriendSelector: React.FC<FriendSelectorProps> = ({
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
   const [searchText, setSearchText] = useState("");
   const [loadingFriends, setLoadingFriends] = useState(false);
-  const { token } = useAuth();
+  const [sendToSelf, setSendToSelf] = useState(false);
+  const { token, user } = useAuth();
 
   const loadFriends = useCallback(async () => {
     if (!token) return;
@@ -78,14 +79,25 @@ export const FriendSelector: React.FC<FriendSelectorProps> = ({
   };
 
   const handleSend = () => {
-    if (selectedFriends.length > 0) {
-      onSendToFriends(selectedFriends);
+    const recipients: string[] = [];
+
+    // Add self if selected
+    if (sendToSelf && user) {
+      recipients.push(user.id);
+    }
+
+    // Add selected friends
+    recipients.push(...selectedFriends);
+
+    if (recipients.length > 0) {
+      onSendToFriends(recipients);
     }
   };
 
   const handleClose = () => {
     setSelectedFriends([]);
     setSearchText("");
+    setSendToSelf(false);
     onClose();
   };
 
@@ -130,30 +142,146 @@ export const FriendSelector: React.FC<FriendSelectorProps> = ({
             )}
 
             {friends.length === 0 ? (
-              <div
-                style={{
-                  textAlign: "center",
-                  padding: "48px 24px",
-                  color: "var(--ion-color-medium)",
-                }}
-              >
-                <IonIcon
-                  icon={person}
-                  style={{ fontSize: "64px", marginBottom: "16px" }}
-                />
-                <IonText>
-                  <h3>No Friends Yet</h3>
-                  <p>Add friends to start sharing color palettes!</p>
-                </IonText>
-              </div>
+              <>
+                {/* Send to Self Option - Always available */}
+                {user && (
+                  <IonList>
+                    <IonItem>
+                      <IonLabel>
+                        <h2>Send palette to:</h2>
+                        <p>{sendToSelf ? "1" : "0"} selected</p>
+                      </IonLabel>
+                    </IonItem>
+
+                    <IonItem
+                      button
+                      onClick={() => setSendToSelf(!sendToSelf)}
+                      style={{
+                        backgroundColor: sendToSelf
+                          ? "var(--ion-color-primary-tint)"
+                          : undefined,
+                        borderLeft: sendToSelf
+                          ? "4px solid var(--ion-color-primary)"
+                          : "4px solid transparent",
+                      }}
+                    >
+                      <IonAvatar slot="start">
+                        <div
+                          style={{
+                            width: "40px",
+                            height: "40px",
+                            borderRadius: "50%",
+                            backgroundColor: "var(--ion-color-success)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "white",
+                            fontSize: "18px",
+                            fontWeight: "bold",
+                          }}
+                        >
+                          {user.displayName.charAt(0).toUpperCase()}
+                        </div>
+                      </IonAvatar>
+
+                      <IonLabel>
+                        <h2>{user.displayName} (You)</h2>
+                        <p>{user.email} • For testing</p>
+                      </IonLabel>
+
+                      <IonCheckbox
+                        slot="end"
+                        checked={sendToSelf}
+                        onIonChange={() => setSendToSelf(!sendToSelf)}
+                      />
+                    </IonItem>
+                  </IonList>
+                )}
+
+                <div
+                  style={{
+                    textAlign: "center",
+                    padding: "48px 24px",
+                    color: "var(--ion-color-medium)",
+                  }}
+                >
+                  <IonIcon
+                    icon={person}
+                    style={{ fontSize: "64px", marginBottom: "16px" }}
+                  />
+                  <IonText>
+                    <h3>No Friends Yet</h3>
+                    <p>Add friends to start sharing color palettes!</p>
+                    {user && (
+                      <p style={{ marginTop: "16px" }}>
+                        You can still send to yourself for testing.
+                      </p>
+                    )}
+                  </IonText>
+                </div>
+              </>
             ) : (
               <IonList>
                 <IonItem>
                   <IonLabel>
                     <h2>Select friends to send palette to:</h2>
-                    <p>{selectedFriends.length} selected</p>
+                    <p>
+                      {(sendToSelf ? 1 : 0) + selectedFriends.length} selected
+                      {sendToSelf &&
+                        selectedFriends.length > 0 &&
+                        " (including yourself)"}
+                      {sendToSelf &&
+                        selectedFriends.length === 0 &&
+                        " (yourself)"}
+                    </p>
                   </IonLabel>
                 </IonItem>
+
+                {/* Send to Self Option */}
+                {user && (
+                  <IonItem
+                    button
+                    onClick={() => setSendToSelf(!sendToSelf)}
+                    style={{
+                      backgroundColor: sendToSelf
+                        ? "var(--ion-color-primary-tint)"
+                        : undefined,
+                      borderLeft: sendToSelf
+                        ? "4px solid var(--ion-color-primary)"
+                        : "4px solid transparent",
+                    }}
+                  >
+                    <IonAvatar slot="start">
+                      <div
+                        style={{
+                          width: "40px",
+                          height: "40px",
+                          borderRadius: "50%",
+                          backgroundColor: "var(--ion-color-success)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: "white",
+                          fontSize: "18px",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {user.displayName.charAt(0).toUpperCase()}
+                      </div>
+                    </IonAvatar>
+
+                    <IonLabel>
+                      <h2>{user.displayName} (You)</h2>
+                      <p>{user.email} • For testing</p>
+                    </IonLabel>
+
+                    <IonCheckbox
+                      slot="end"
+                      checked={sendToSelf}
+                      onIonChange={() => setSendToSelf(!sendToSelf)}
+                    />
+                  </IonItem>
+                )}
 
                 {filteredFriends.map((friend) => (
                   <IonItem
@@ -195,19 +323,36 @@ export const FriendSelector: React.FC<FriendSelectorProps> = ({
               </IonList>
             )}
 
-            {friends.length > 0 && (
+            {(friends.length > 0 || user) && (
               <div style={{ padding: "16px" }}>
                 <IonButton
                   expand="block"
                   onClick={handleSend}
-                  disabled={selectedFriends.length === 0 || isLoading}
+                  disabled={
+                    (selectedFriends.length === 0 && !sendToSelf) || isLoading
+                  }
                 >
                   <IonIcon icon={send} slot="start" />
                   {isLoading
                     ? "Sending..."
-                    : `Send to ${selectedFriends.length} friend${
-                        selectedFriends.length !== 1 ? "s" : ""
-                      }`}
+                    : (() => {
+                        const totalRecipients =
+                          (sendToSelf ? 1 : 0) + selectedFriends.length;
+                        if (totalRecipients === 0) return "Select recipients";
+                        if (totalRecipients === 1) {
+                          if (sendToSelf && selectedFriends.length === 0)
+                            return "Send to yourself";
+                          return "Send to 1 friend";
+                        }
+                        if (sendToSelf && selectedFriends.length > 0) {
+                          return `Send to ${selectedFriends.length} friend${
+                            selectedFriends.length !== 1 ? "s" : ""
+                          } + yourself`;
+                        }
+                        return `Send to ${selectedFriends.length} friend${
+                          selectedFriends.length !== 1 ? "s" : ""
+                        }`;
+                      })()}
                 </IonButton>
               </div>
             )}
