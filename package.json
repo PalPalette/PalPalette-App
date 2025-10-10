@@ -51,7 +51,6 @@
     "@types/colorthief": "^2.6.0",
     "@types/react-router": "^5.1.20",
     "@types/react-router-dom": "^5.3.3",
-    "@types/socket.io-client": "^1.4.36",
     "colorthief": "^2.6.0",
     "ionicons": "^7.4.0",
     "react": "19.0.0",
@@ -59,9 +58,7 @@
     "react-hook-form": "^7.61.1",
     "react-router": "^5.3.4",
     "react-router-dom": "^5.3.4",
-    "socket.io-client": "^4.8.1",
-    "yup": "^1.7.0",
-    "zod": "^4.0.10"
+    "yup": "^1.7.0"
   },
   "devDependencies": {
     "@capacitor/cli": "7.4.2",
