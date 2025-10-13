@@ -127,7 +127,7 @@ export const useAuth = (): UseAuthReturn => {
         // displayName is username for DTO
         const registerDto = { email, password, displayName: username };
         const response = await AuthenticationService.authControllerRegister(
-          navigator.userAgent || 'PalPalette-App',
+          navigator.userAgent || "PalPalette-App",
           registerDto
         );
 

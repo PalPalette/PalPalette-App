@@ -33,6 +33,9 @@ export namespace LightingSystemConfigDto {
         WLED = 'wled',
         WS2812 = 'ws2812',
         PHILIPS_HUE = 'philips_hue',
+        NEOPIXEL = 'neopixel',
+        ADDRESSABLE_LED = 'addressable_led',
+        GENERIC_RGB = 'generic_rgb',
     }
 }
 

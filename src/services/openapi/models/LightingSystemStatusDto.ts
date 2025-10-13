@@ -22,7 +22,7 @@ export type LightingSystemStatusDto = {
     /**
      * Current status of the lighting system
      */
-    lightingStatus: string;
+    lightingStatus: LightingSystemStatusDto.lightingStatus;
     /**
      * Last time the lighting system was tested
      */
@@ -35,5 +35,20 @@ export type LightingSystemStatusDto = {
      * Capabilities of the lighting system
      */
     capabilities?: Record<string, any>;
+    /**
+     * Full status details from the edge controller (lightingStatusDetails field)
+     */
+    lightingStatusDetails?: Record<string, any>;
 };
+export namespace LightingSystemStatusDto {
+    /**
+     * Current status of the lighting system
+     */
+    export enum lightingStatus {
+        UNKNOWN = 'unknown',
+        WORKING = 'working',
+        ERROR = 'error',
+        AUTHENTICATION_REQUIRED = 'authentication_required',
+    }
+}
 
