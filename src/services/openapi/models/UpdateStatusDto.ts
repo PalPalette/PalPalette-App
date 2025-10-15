@@ -36,5 +36,13 @@ export type UpdateStatusDto = {
         uptime?: number;
         lastUpdate?: string;
     };
+    /**
+     * Free heap memory in bytes (ESP32 direct property)
+     */
+    freeHeap?: number;
+    /**
+     * Device uptime in seconds (ESP32 direct property)
+     */
+    uptime?: number;
 };
 

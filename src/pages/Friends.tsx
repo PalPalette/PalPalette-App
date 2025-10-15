@@ -22,13 +22,7 @@ import {
   IonRefresherContent,
 } from "@ionic/react";
 import { person, checkmark, close, mail } from "ionicons/icons";
-import { useAuth } from "../hooks/useContexts";
-
-interface Friend {
-  id: string;
-  email: string;
-  displayName: string;
-}
+import type { FriendDto } from "../services/openapi/models/FriendDto";
 
 interface FriendRequest {
   id: string;
@@ -41,14 +35,13 @@ interface FriendRequest {
 }
 
 const Friends: React.FC = () => {
-  const [friends, setFriends] = useState<Friend[]>([]);
+  const [friends, setFriends] = useState<FriendDto[]>([]);
   const [pendingRequests, setPendingRequests] = useState<FriendRequest[]>([]);
   const [friendEmail, setFriendEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [toastColor, setToastColor] = useState<"success" | "danger">("success");
-  const { token } = useAuth();
 
   const showMessage = (
     message: string,
@@ -66,7 +59,7 @@ const Friends: React.FC = () => {
         "../services/openapi/services/UsersService"
       );
       const [friendsList, pendingList] = await Promise.all([
-        UsersService.usersControllerGetFriends(),
+        UsersService.usersControllerGetFriends(true),
         UsersService.usersControllerGetPendingRequests(),
       ]);
       setFriends(friendsList);
@@ -77,7 +70,7 @@ const Friends: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -309,6 +302,26 @@ const Friends: React.FC = () => {
                       <IonLabel>
                         <h2>{friend.displayName}</h2>
                         <p>{friend.email}</p>
+                        {friend.devices && friend.devices.length > 0 ? (
+                          <p
+                            style={{
+                              fontSize: "0.9em",
+                              color: "var(--ion-color-success)",
+                            }}
+                          >
+                            {friend.devices.length} device
+                            {friend.devices.length !== 1 ? "s" : ""} available
+                          </p>
+                        ) : (
+                          <p
+                            style={{
+                              fontSize: "0.9em",
+                              color: "var(--ion-color-medium)",
+                            }}
+                          >
+                            No devices available
+                          </p>
+                        )}
                       </IonLabel>
                     </IonItem>
                   ))}

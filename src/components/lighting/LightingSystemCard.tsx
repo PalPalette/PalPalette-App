@@ -18,6 +18,7 @@ import {
   LightingSystemService,
   LightingSystemStatus,
 } from "../../services/LightingSystemService";
+import { LightingSystemStatusDto } from "../../services/openapi/models/LightingSystemStatusDto";
 import { useLoading, useToast, useWebSocket } from "../../hooks";
 import { useDeveloperMode } from "../../hooks/useDeveloperMode";
 import { LightingSystemStatusEvent } from "../../services/WebSocketService";
@@ -56,15 +57,12 @@ const LightingSystemCard: React.FC<LightingSystemCardProps> = memo(
         console.log("🔥 Updating lighting status from WebSocket:", wsStatus);
 
         // Map WebSocket status to our lighting status enum
-        let lightingStatus:
-          | "unknown"
-          | "working"
-          | "error"
-          | "authentication_required" = "unknown";
+        let lightingStatus: LightingSystemStatusDto.lightingStatus =
+          LightingSystemStatusDto.lightingStatus.UNKNOWN;
 
         // If device is ready and has a lighting system, it's working
         if (wsStatus.isReady && wsStatus.hasLightingSystem) {
-          lightingStatus = "working";
+          lightingStatus = LightingSystemStatusDto.lightingStatus.WORKING;
         } else if (wsStatus.status) {
           const statusLower = wsStatus.status.toLowerCase();
           if (
@@ -73,21 +71,22 @@ const LightingSystemCard: React.FC<LightingSystemCardProps> = memo(
             statusLower.includes("working") ||
             statusLower.includes("success")
           ) {
-            lightingStatus = "working";
+            lightingStatus = LightingSystemStatusDto.lightingStatus.WORKING;
           } else if (
             statusLower.includes("error") ||
             statusLower.includes("failed") ||
             statusLower.includes("timeout") ||
             statusLower.includes("invalid")
           ) {
-            lightingStatus = "error";
+            lightingStatus = LightingSystemStatusDto.lightingStatus.ERROR;
           } else if (
             statusLower.includes("authentication") ||
             statusLower.includes("auth") ||
             statusLower.includes("unauthorized") ||
             statusLower.includes("token")
           ) {
-            lightingStatus = "authentication_required";
+            lightingStatus =
+              LightingSystemStatusDto.lightingStatus.AUTHENTICATION_REQUIRED;
           }
         }
 

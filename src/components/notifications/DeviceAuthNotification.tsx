@@ -34,6 +34,8 @@ import {
   NotificationAction,
   DeviceAuthenticationState,
 } from "../../services/UserNotificationService";
+import { DevicesService } from "../../services/openapi/services/DevicesService";
+import { LightingSystemStatusDto } from "../../services/openapi/models/LightingSystemStatusDto";
 
 interface DeviceAuthNotificationProps {
   deviceId: string;
@@ -43,7 +45,6 @@ interface DeviceAuthNotificationProps {
   onSuccess?: () => void;
   onFailed?: () => void;
   onRetry?: () => void;
-  className?: string;
 }
 
 const DeviceAuthNotification: React.FC<DeviceAuthNotificationProps> = ({
@@ -54,13 +55,15 @@ const DeviceAuthNotification: React.FC<DeviceAuthNotificationProps> = ({
   onSuccess,
   onFailed,
   onRetry,
-  className,
 }) => {
   const [authState, setAuthState] = useState<DeviceAuthenticationState | null>(
     null
   );
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
+  const [lightingStatus, setLightingStatus] =
+    useState<LightingSystemStatusDto | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
 
   const handleNotification = useCallback(
     (notification: UserNotification) => {
@@ -115,6 +118,80 @@ const DeviceAuthNotification: React.FC<DeviceAuthNotificationProps> = ({
     [deviceId, onSuccess, onFailed, onDismiss]
   );
 
+  // Polling function to get lighting system status
+  const pollLightingStatus = useCallback(async () => {
+    try {
+      const status =
+        await DevicesService.devicesControllerGetLightingSystemStatus(deviceId);
+      setLightingStatus(status);
+
+      // Map lighting status to notification actions for UI consistency
+      if (
+        status.lightingStatus ===
+          LightingSystemStatusDto.lightingStatus.WORKING ||
+        status.lightingSystemConfigured
+      ) {
+        const successNotification: UserNotification = {
+          deviceId,
+          action: NotificationAction.AUTHENTICATION_SUCCESS,
+          message: "Device connected successfully!",
+          timestamp: Date.now(),
+        };
+        handleNotification(successNotification);
+        setIsPolling(false);
+      } else if (
+        status.lightingStatus === LightingSystemStatusDto.lightingStatus.ERROR
+      ) {
+        const failedNotification: UserNotification = {
+          deviceId,
+          action: NotificationAction.AUTHENTICATION_FAILED,
+          message: "Authentication failed. Please try again.",
+          timestamp: Date.now(),
+        };
+        handleNotification(failedNotification);
+        setIsPolling(false);
+      } else if (
+        status.lightingStatus ===
+          LightingSystemStatusDto.lightingStatus.AUTHENTICATION_REQUIRED ||
+        (status.requiresAuthentication &&
+          status.lightingStatus ===
+            LightingSystemStatusDto.lightingStatus.UNKNOWN)
+      ) {
+        // Check if we have pairing code in the status details
+        const pairingCode = status.lightingStatusDetails?.pairingCode;
+        const authStep = status.lightingStatusDetails?.authStep;
+
+        let action: NotificationAction;
+        let message: string;
+
+        if (pairingCode) {
+          action = NotificationAction.ENTER_PAIRING_CODE;
+          message = "Enter the pairing code in your lighting app";
+        } else if (authStep === "press_power_button" || !authStep) {
+          action = NotificationAction.PRESS_POWER_BUTTON;
+          message = "Press the power button on your device to start pairing";
+        } else {
+          action = NotificationAction.PRESS_POWER_BUTTON;
+          message = "Authentication required - follow device instructions";
+        }
+
+        const pairingNotification: UserNotification = {
+          deviceId,
+          action,
+          message,
+          pairingCode,
+          timestamp: Date.now(),
+        };
+        handleNotification(pairingNotification);
+      }
+    } catch (error) {
+      console.error("Failed to poll lighting status:", error);
+      // Don't stop polling on network errors, but show toast for user feedback
+      setToastMessage("Connection error - retrying...");
+      setShowToast(true);
+    }
+  }, [deviceId, handleNotification, setLightingStatus, setIsPolling]);
+
   useEffect(() => {
     if (!isVisible) return;
 
@@ -135,6 +212,31 @@ const DeviceAuthNotification: React.FC<DeviceAuthNotificationProps> = ({
       userNotificationService.removeAuthenticationCallback(deviceId);
     };
   }, [deviceId, isVisible, handleNotification]);
+
+  // Separate useEffect for polling to avoid dependency issues
+  useEffect(() => {
+    if (!isVisible || !isPolling) return;
+
+    // Initial poll
+    pollLightingStatus();
+
+    const pollInterval = setInterval(() => {
+      pollLightingStatus();
+    }, 2000); // Poll every 2 seconds
+
+    return () => {
+      clearInterval(pollInterval);
+    };
+  }, [isVisible, isPolling, pollLightingStatus]);
+
+  // Start polling when modal becomes visible
+  useEffect(() => {
+    if (isVisible) {
+      setIsPolling(true);
+    } else {
+      setIsPolling(false);
+    }
+  }, [isVisible]);
 
   const getStepIcon = (action: NotificationAction | null) => {
     switch (action) {
@@ -177,6 +279,23 @@ const DeviceAuthNotification: React.FC<DeviceAuthNotificationProps> = ({
         return 0.0;
       default:
         return 0.1;
+    }
+  };
+
+  const getStatusDisplayText = (
+    status: LightingSystemStatusDto.lightingStatus
+  ) => {
+    switch (status) {
+      case LightingSystemStatusDto.lightingStatus.WORKING:
+        return "Connected and working";
+      case LightingSystemStatusDto.lightingStatus.ERROR:
+        return "Connection error";
+      case LightingSystemStatusDto.lightingStatus.AUTHENTICATION_REQUIRED:
+        return "Authentication needed";
+      case LightingSystemStatusDto.lightingStatus.UNKNOWN:
+        return "Checking connection...";
+      default:
+        return status;
     }
   };
 
@@ -224,6 +343,17 @@ const DeviceAuthNotification: React.FC<DeviceAuthNotificationProps> = ({
                   <div style={{ marginTop: "16px" }}>
                     <IonText>
                       <h3>{authState.message}</h3>
+                      {lightingStatus && (
+                        <p
+                          style={{
+                            fontSize: "0.9em",
+                            color: "var(--ion-color-medium)",
+                          }}
+                        >
+                          Status:{" "}
+                          {getStatusDisplayText(lightingStatus.lightingStatus)}
+                        </p>
+                      )}
                     </IonText>
 
                     {authState.currentStep ===
@@ -309,6 +439,9 @@ const DeviceAuthNotification: React.FC<DeviceAuthNotificationProps> = ({
                             color="primary"
                             onClick={() => {
                               // Trigger retry logic here
+                              onRetry?.();
+                              setIsPolling(true);
+                              pollLightingStatus();
                               setToastMessage("Retrying connection...");
                               setShowToast(true);
                             }}
@@ -336,8 +469,19 @@ const DeviceAuthNotification: React.FC<DeviceAuthNotificationProps> = ({
                 <div style={{ textAlign: "center", padding: "20px" }}>
                   <IonIcon icon={bulb} size="large" color="medium" />
                   <IonText>
-                    <p>Waiting for device authentication to begin...</p>
+                    <p>
+                      {isPolling
+                        ? `Checking device status...${
+                            lightingStatus
+                              ? ` (${getStatusDisplayText(
+                                  lightingStatus.lightingStatus
+                                )})`
+                              : ""
+                          }`
+                        : "Waiting for device authentication to begin..."}
+                    </p>
                   </IonText>
+                  {isPolling && <IonSpinner name="crescent" />}
                 </div>
               )}
             </IonCardContent>

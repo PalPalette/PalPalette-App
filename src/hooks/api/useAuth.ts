@@ -127,6 +127,7 @@ export const useAuth = (): UseAuthReturn => {
         // displayName is username for DTO
         const registerDto = { email, password, displayName: username };
         const response = await AuthenticationService.authControllerRegister(
+          navigator.userAgent || "PalPalette-App",
           registerDto
         );
 
@@ -189,7 +190,7 @@ export const useAuth = (): UseAuthReturn => {
         "../../services/enhanced-api-client"
       );
       const newToken = await enhancedApiClient.refreshAccessToken();
-      const userData = enhancedApiClient.getUser();
+      const userData = await enhancedApiClient.getUser();
 
       if (newToken && userData?.id && userData?.displayName) {
         const user = {

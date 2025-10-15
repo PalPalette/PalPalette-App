@@ -20,7 +20,7 @@ import {
   IonSegment,
   IonSegmentButton,
 } from "@ionic/react";
-import { send, camera, shuffle, colorPalette, brush } from "ionicons/icons";
+import { send, camera, shuffle, brush } from "ionicons/icons";
 import { PhotoPicker } from "../components/common";
 import { ColorPicker } from "../components/common/ColorPicker";
 import { FriendSelector } from "../components/common";
@@ -28,9 +28,7 @@ import {
   ColorPalette,
   ExtractedColor,
 } from "../services/ColorExtractionService";
-import { MessagesService } from "../services/openapi/services/MessagesService";
-import { CreateMessageDto } from "../services/openapi/models/CreateMessageDto";
-import { useAuth } from "../hooks";
+import { useAuth } from "../hooks/useContexts";
 
 type CreationMode = "photo" | "manual";
 
@@ -158,7 +156,10 @@ const PaletteCreator: React.FC = () => {
     handleColorsReordered(shuffled);
   };
 
-  const handleSendToFriends = async (friendIds: string[]) => {
+  // Legacy version - accepts array of { friendId, deviceId }
+  const handleSendToFriends = async (
+    recipients: { friendId: string; deviceId: string }[]
+  ) => {
     if (!user) {
       showMessage("Please login to send palettes", "danger");
       return;
@@ -172,22 +173,70 @@ const PaletteCreator: React.FC = () => {
     try {
       setIsLoading(true);
 
-      // Send color palette to each friend using the OpenAPI MessagesService
-      const sendPromises = friendIds.map((friendId) =>
-        MessagesService.messagesControllerCreate({
-          senderId: user.id,
-          recipientId: friendId,
-          deviceId: friendId, // Using friendId as deviceId - this might need adjustment based on your backend logic
-          colors: currentPalette.colors.map((color) => color.hex),
-          content: "Shared a color palette with you!",
-        })
+      // Use the new enhanced API to send palette to friends
+      const { UsersService } = await import(
+        "../services/openapi/services/UsersService"
       );
 
-      await Promise.all(sendPromises);
+      await UsersService.usersControllerSendPaletteToFriends({
+        friendIds: recipients.map((r) => r.friendId),
+        colors: currentPalette.colors.map((color) => color.hex),
+        imageUrl:
+          currentPalette.source === "camera"
+            ? currentPalette.imageUrl
+            : undefined,
+      });
 
       showMessage(
-        `Palette sent to ${friendIds.length} friend${
-          friendIds.length !== 1 ? "s" : ""
+        `Palette sent to ${recipients.length} recipient${
+          recipients.length !== 1 ? "s" : ""
+        }!`
+      );
+
+      setTimeout(() => {
+        setCurrentPalette(null);
+        setShowFriendSelector(false);
+      }, 2000);
+    } catch (error) {
+      console.error("Error sending palette:", error);
+      showMessage("Failed to send palette", "danger");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Enhanced version - accepts array of friendIds directly
+  const handleSendToFriendsEnhanced = async (friendIds: string[]) => {
+    if (!user) {
+      showMessage("Please login to send palettes", "danger");
+      return;
+    }
+
+    if (!currentPalette) {
+      showMessage("No palette to send", "danger");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+
+      // Use the new enhanced API to send palette to friends
+      const { UsersService } = await import(
+        "../services/openapi/services/UsersService"
+      );
+
+      await UsersService.usersControllerSendPaletteToFriends({
+        friendIds: friendIds,
+        colors: currentPalette.colors.map((color) => color.hex),
+        imageUrl:
+          currentPalette.source === "camera"
+            ? currentPalette.imageUrl
+            : undefined,
+      });
+
+      showMessage(
+        `Palette sent to ${recipients.length} recipient${
+          recipients.length !== 1 ? "s" : ""
         }!`
       );
 

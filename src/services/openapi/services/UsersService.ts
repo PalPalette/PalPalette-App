@@ -3,12 +3,15 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { CreateColorPaletteDto } from '../models/CreateColorPaletteDto';
+import type { FriendDto } from '../models/FriendDto';
 import type { Friendship } from '../models/Friendship';
 import type { Message } from '../models/Message';
+import type { MessageTimeframeResponseDto } from '../models/MessageTimeframeResponseDto';
 import type { RegisterUserDto } from '../models/RegisterUserDto';
 import type { RespondToFriendRequestDto } from '../models/RespondToFriendRequestDto';
 import type { SendFriendRequestDto } from '../models/SendFriendRequestDto';
 import type { SendPaletteToFriendsDto } from '../models/SendPaletteToFriendsDto';
+import type { SetMessageTimeframeDto } from '../models/SetMessageTimeframeDto';
 import type { UpdateColorPaletteDto } from '../models/UpdateColorPaletteDto';
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
@@ -78,14 +81,20 @@ export class UsersService {
         });
     }
     /**
-     * Get list of friends
-     * @returns any List of friends retrieved successfully
+     * Get list of friends (optionally with devices)
+     * @param includeDevices If true, each friend will include a devices array with their devices. If false or omitted, devices will be an empty array.
+     * @returns FriendDto List of friends retrieved successfully. If includeDevices=true, each friend will include a devices array.
      * @throws ApiError
      */
-    public static usersControllerGetFriends(): CancelablePromise<any> {
+    public static usersControllerGetFriends(
+        includeDevices?: boolean,
+    ): CancelablePromise<Array<FriendDto>> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/users/friends',
+            query: {
+                'includeDevices': includeDevices,
+            },
             errors: {
                 401: `Unauthorized`,
             },
@@ -292,6 +301,40 @@ export class UsersService {
                 400: `Bad request - validation error`,
                 401: `Unauthorized`,
                 404: `Message or device not found`,
+            },
+        });
+    }
+    /**
+     * Set user's message receiving timeframe
+     * @param requestBody
+     * @returns MessageTimeframeResponseDto Message timeframe updated successfully
+     * @throws ApiError
+     */
+    public static usersControllerSetMessageTimeframe(
+        requestBody: SetMessageTimeframeDto,
+    ): CancelablePromise<MessageTimeframeResponseDto> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/users/message-timeframe',
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Bad request - validation error`,
+                401: `Unauthorized`,
+            },
+        });
+    }
+    /**
+     * Get user's message receiving timeframe
+     * @returns MessageTimeframeResponseDto Message timeframe retrieved successfully
+     * @throws ApiError
+     */
+    public static usersControllerGetMessageTimeframe(): CancelablePromise<MessageTimeframeResponseDto> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/users/message-timeframe',
+            errors: {
+                401: `Unauthorized`,
             },
         });
     }

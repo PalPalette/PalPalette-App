@@ -1,4 +1,9 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { UsersService } from "../services/openapi/services/UsersService";
+import type { MessageTimeframeResponseDto } from "../services/openapi/models/MessageTimeframeResponseDto";
+
+// All hooks must be inside the component
+
 import {
   IonContent,
   IonHeader,
@@ -33,6 +38,47 @@ const Settings: React.FC = () => {
   const { user, logout } = useAuth();
   const { isDeveloperMode, toggleDeveloperMode } = useDeveloperMode();
 
+  // Message timeframe state (must be inside component)
+  const [timeframeEnabled, setTimeframeEnabled] = useState(false);
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [loadingTimeframe, setLoadingTimeframe] = useState(true);
+  const [savingTimeframe, setSavingTimeframe] = useState(false);
+  const [timeframeError, setTimeframeError] = useState<string | null>(null);
+  const [timeframeSuccess, setTimeframeSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLoadingTimeframe(true);
+    UsersService.usersControllerGetMessageTimeframe()
+      .then((res: MessageTimeframeResponseDto) => {
+        setTimeframeEnabled(res.isConfigured);
+        setStartTime(res.messageStartTime || "");
+        setEndTime(res.messageEndTime || "");
+        setTimeframeError(null);
+      })
+      .catch(() => {
+        setTimeframeError("Failed to load message timeframe.");
+      })
+      .finally(() => setLoadingTimeframe(false));
+  }, []);
+
+  const handleSaveTimeframe = async () => {
+    setSavingTimeframe(true);
+    setTimeframeError(null);
+    setTimeframeSuccess(null);
+    try {
+      const dto = timeframeEnabled
+        ? { messageStartTime: startTime, messageEndTime: endTime }
+        : { messageStartTime: undefined, messageEndTime: undefined };
+      await UsersService.usersControllerSetMessageTimeframe(dto);
+      setTimeframeSuccess("Timeframe saved successfully.");
+    } catch {
+      setTimeframeError("Failed to save timeframe.");
+    } finally {
+      setSavingTimeframe(false);
+    }
+  };
+
   const handleLogout = () => {
     logout();
   };
@@ -63,6 +109,72 @@ const Settings: React.FC = () => {
           </IonCardContent>
         </IonCard>
 
+        {/* Message Timeframe */}
+        <IonCard>
+          <IonCardHeader>
+            <IonCardTitle>Message Timeframe</IonCardTitle>
+          </IonCardHeader>
+          <IonCardContent>
+            {loadingTimeframe ? (
+              <IonText>Loading timeframe...</IonText>
+            ) : (
+              <>
+                <IonList>
+                  <IonItem>
+                    <IonLabel>Enable Timeframe</IonLabel>
+                    <IonToggle
+                      checked={timeframeEnabled}
+                      onIonChange={(e) => setTimeframeEnabled(e.detail.checked)}
+                      slot="end"
+                    />
+                  </IonItem>
+                  <IonItem>
+                    <IonLabel position="stacked">Start Time</IonLabel>
+                    <input
+                      type="time"
+                      value={startTime}
+                      onChange={(e) => setStartTime(e.target.value)}
+                      style={{ width: "100%" }}
+                      disabled={!timeframeEnabled}
+                    />
+                  </IonItem>
+                  <IonItem>
+                    <IonLabel position="stacked">End Time</IonLabel>
+                    <input
+                      type="time"
+                      value={endTime}
+                      onChange={(e) => setEndTime(e.target.value)}
+                      style={{ width: "100%" }}
+                      disabled={!timeframeEnabled}
+                    />
+                  </IonItem>
+                </IonList>
+                {timeframeError && (
+                  <IonText color="danger">
+                    <p>{timeframeError}</p>
+                  </IonText>
+                )}
+                {timeframeSuccess && (
+                  <IonText color="success">
+                    <p>{timeframeSuccess}</p>
+                  </IonText>
+                )}
+                <IonButton
+                  expand="block"
+                  style={{ marginTop: 12 }}
+                  onClick={handleSaveTimeframe}
+                  disabled={
+                    savingTimeframe ||
+                    (timeframeEnabled && (!startTime || !endTime))
+                  }
+                  color="primary"
+                >
+                  {savingTimeframe ? "Saving..." : "Save Timeframe"}
+                </IonButton>
+              </>
+            )}
+          </IonCardContent>
+        </IonCard>
         {/* App Info */}
         <IonCard>
           <IonCardHeader>

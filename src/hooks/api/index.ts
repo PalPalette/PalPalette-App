@@ -5,5 +5,8 @@ export type { UseDevicesReturn } from "./useDevices";
 export { useLighting } from "./useLighting";
 export type { UseLightingReturn } from "./useLighting";
 
+export { useLightingStatus } from "./useLightingStatus";
+export type { UseLightingStatusReturn } from "./useLightingStatus";
+
 export { useAuth } from "./useAuth";
 export type { UseAuthReturn, AuthState } from "./useAuth";

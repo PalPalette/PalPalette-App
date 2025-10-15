@@ -7,7 +7,6 @@ import type { Message } from './Message';
 export type User = {
     id: string;
     email: string;
-    passwordHash: string;
     displayName: string;
     createdAt: string;
     updatedAt: string;

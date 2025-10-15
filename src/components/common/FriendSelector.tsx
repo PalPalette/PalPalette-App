@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+
 import {
   IonModal,
   IonHeader,
@@ -20,16 +21,18 @@ import {
 import { person, send } from "ionicons/icons";
 import { useAuth } from "../../hooks/useContexts";
 
-interface Friend {
-  id: string;
-  email: string;
-  displayName: string;
+import type { FriendDto } from "../../services/openapi/models/FriendDto";
+import type { FriendDeviceDto } from "../../services/openapi/models/FriendDeviceDto";
+
+interface Recipient {
+  friendId: string;
+  deviceId: string;
 }
 
 interface FriendSelectorProps {
   isOpen: boolean;
   onClose: () => void;
-  onSendToFriends: (friendIds: string[]) => void;
+  onSendToFriends: (recipients: Recipient[]) => void;
   isLoading?: boolean;
 }
 
@@ -39,11 +42,13 @@ export const FriendSelector: React.FC<FriendSelectorProps> = ({
   onSendToFriends,
   isLoading = false,
 }) => {
-  const [friends, setFriends] = useState<Friend[]>([]);
+  const [friends, setFriends] = useState<FriendDto[]>([]);
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
   const [searchText, setSearchText] = useState("");
   const [loadingFriends, setLoadingFriends] = useState(false);
   const [sendToSelf, setSendToSelf] = useState(false);
+  const [userDevices, setUserDevices] = useState<FriendDeviceDto[]>([]);
+  const [sendError, setSendError] = useState<string | null>(null);
   const { token, user } = useAuth();
 
   const loadFriends = useCallback(async () => {
@@ -54,8 +59,9 @@ export const FriendSelector: React.FC<FriendSelectorProps> = ({
       const { UsersService } = await import(
         "../../services/openapi/services/UsersService"
       );
-      // The OpenAPI client should handle auth automatically if configured
-      const friendsList = await UsersService.usersControllerGetFriends();
+      // Include devices when fetching friends for color palette sharing
+      const friendsList = await UsersService.usersControllerGetFriends(true);
+      console.log("Fetched friends with devices included:", friendsList);
       setFriends(friendsList);
     } catch (error) {
       console.error("Error loading friends:", error);
@@ -67,8 +73,28 @@ export const FriendSelector: React.FC<FriendSelectorProps> = ({
   useEffect(() => {
     if (isOpen) {
       loadFriends();
+      (async () => {
+        if (user) {
+          try {
+            const { UsersService } = await import(
+              "../../services/openapi/services/UsersService"
+            );
+            const userInfo = await UsersService.usersControllerGetUser(user.id);
+            if (userInfo && Array.isArray(userInfo.devices)) {
+              setUserDevices(userInfo.devices);
+            } else {
+              setUserDevices([]);
+            }
+          } catch (error) {
+            console.error("Error loading user devices:", error);
+            setUserDevices([]);
+          }
+        } else {
+          setUserDevices([]);
+        }
+      })();
     }
-  }, [isOpen, loadFriends]);
+  }, [isOpen, loadFriends, user]);
 
   const toggleFriendSelection = (friendId: string) => {
     setSelectedFriends((prev) =>
@@ -79,18 +105,28 @@ export const FriendSelector: React.FC<FriendSelectorProps> = ({
   };
 
   const handleSend = () => {
-    const recipients: string[] = [];
+    setSendError(null);
+    const recipients: Recipient[] = [];
 
     // Add self if selected
-    if (sendToSelf && user) {
-      recipients.push(user.id);
+    if (sendToSelf && user && userDevices.length > 0) {
+      recipients.push({ friendId: user.id, deviceId: userDevices[0].id });
     }
 
     // Add selected friends
-    recipients.push(...selectedFriends);
+    selectedFriends.forEach((friendId) => {
+      const friend = friends.find((f) => f.id === friendId);
+      if (friend && friend.devices && friend.devices.length > 0) {
+        recipients.push({ friendId, deviceId: friend.devices[0].id });
+      } else {
+        console.log("No devices available for friend:", friendId);
+      }
+    });
 
     if (recipients.length > 0) {
       onSendToFriends(recipients);
+    } else {
+      setSendError("Please select at least one recipient with a device.");
     }
   };
 
@@ -325,12 +361,15 @@ export const FriendSelector: React.FC<FriendSelectorProps> = ({
 
             {(friends.length > 0 || user) && (
               <div style={{ padding: "16px" }}>
+                {sendError && (
+                  <IonText color="danger">
+                    <p>{sendError}</p>
+                  </IonText>
+                )}
                 <IonButton
                   expand="block"
                   onClick={handleSend}
-                  disabled={
-                    (selectedFriends.length === 0 && !sendToSelf) || isLoading
-                  }
+                  disabled={isLoading}
                 >
                   <IonIcon icon={send} slot="start" />
                   {isLoading
@@ -338,7 +377,7 @@ export const FriendSelector: React.FC<FriendSelectorProps> = ({
                     : (() => {
                         const totalRecipients =
                           (sendToSelf ? 1 : 0) + selectedFriends.length;
-                        if (totalRecipients === 0) return "Select recipients";
+                        if (totalRecipients === 0) return "Send";
                         if (totalRecipients === 1) {
                           if (sendToSelf && selectedFriends.length === 0)
                             return "Send to yourself";
