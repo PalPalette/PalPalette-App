@@ -84,6 +84,49 @@ const DeviceSettingsModal: React.FC<DeviceSettingsModalProps> = ({
 
   return (
     <>
+      <style>
+        {`
+          .reset-device-alert {
+            --backdrop-opacity: 0.6;
+          }
+          
+          .reset-device-alert .alert-wrapper {
+            --border-radius: 12px;
+            --box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+          }
+          
+          .reset-device-alert .alert-head {
+            padding: 20px 20px 0;
+          }
+          
+          .reset-device-alert .alert-message {
+            padding: 16px 20px;
+            font-size: 14px;
+            line-height: 1.5;
+            color: var(--ion-color-medium-shade);
+            white-space: pre-line;
+          }
+          
+          .reset-device-alert .alert-button-group {
+            padding: 8px;
+            gap: 8px;
+          }
+          
+          .alert-button-cancel {
+            --background: var(--ion-color-light);
+            --color: var(--ion-color-dark);
+            --border-radius: 8px;
+            font-weight: 500;
+          }
+          
+          .alert-button-confirm {
+            --background: var(--ion-color-danger);
+            --color: white;
+            --border-radius: 8px;
+            font-weight: 600;
+          }
+        `}
+      </style>
       <IonModal isOpen={isOpen} onDidDismiss={onClose}>
         <IonHeader>
           <IonToolbar>
@@ -233,33 +276,31 @@ const DeviceSettingsModal: React.FC<DeviceSettingsModalProps> = ({
       <IonAlert
         isOpen={showResetConfirm}
         onDidDismiss={() => setShowResetConfirm(false)}
-        header="Reset Device"
-        message={`
-          Are you sure you want to reset "${device.name}"?<br/><br/>
-          
-          <strong>This will:</strong><br/>
-          • Remove the device from your account<br/>
-          • Generate a new pairing code<br/>
-          • Allow the device to be paired with a different account<br/><br/>
-          
-          <strong>You will need to:</strong><br/>
-          • Set up the device again if you want to use it<br/>
-          • Enter a new pairing code to reclaim it<br/><br/>
-          
-          This action cannot be undone.
-        `}
+        header="⚠️ Reset Device"
+        subHeader={`Reset "${device.name}"?`}
+        message={`This will permanently remove the device from your account.
+
+What happens next:
+• Device will be removed from your account
+• A new pairing code will be generated
+• Device can be paired with any account
+• You'll need to set it up again to use it
+
+This action cannot be undone.`}
         buttons={[
           {
             text: "Cancel",
             role: "cancel",
-            cssClass: "secondary",
+            cssClass: "alert-button-cancel",
           },
           {
-            text: "Reset Device",
+            text: "Yes, Reset Device",
             role: "destructive",
+            cssClass: "alert-button-confirm",
             handler: handleReset,
           },
         ]}
+        cssClass="reset-device-alert"
       />
     </>
   );
