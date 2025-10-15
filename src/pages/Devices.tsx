@@ -39,7 +39,7 @@ import {
   LightingSystemCard,
   LightingConfigSimple,
 } from "../components/lighting";
-import { DeviceAuthNotification } from "../components/notifications";
+import { DeviceAuthNotificationLegacy as DeviceAuthNotification } from "../components/notifications";
 
 const Devices: React.FC = () => {
   const history = useHistory();

@@ -48,6 +48,14 @@ const LightingConfigModalEnhanced: React.FC<
   const [currentStep, setCurrentStep] = useState<
     "select" | "configure" | "monitor"
   >("select");
+
+  // Debug current step changes
+  useEffect(() => {
+    console.log(
+      "📍 LightingConfigModalEnhanced - Current step changed to:",
+      currentStep
+    );
+  }, [currentStep]);
   const [config, setConfig] = useState<LightingSystemConfigDto>({
     lightingSystemType: LightingSystemConfigDto.lightingSystemType.NANOLEAF,
     lightingHostAddress: "",
@@ -94,19 +102,23 @@ const LightingConfigModalEnhanced: React.FC<
 
   useEffect(() => {
     if (isOpen && deviceId) {
-      // Initialize with current status if available
-      if (status && status.lightingSystemConfigured) {
-        setCurrentStep("monitor");
-        startPolling(deviceId);
-      } else {
-        setCurrentStep("select");
-      }
+      console.log(
+        "🚀 LightingConfigModalEnhanced - Modal opened, starting status polling for device:",
+        deviceId
+      );
+      // Always start with the select step to allow reconfiguration
+      setCurrentStep("select");
+      // Always start polling to get current status when modal opens
+      startPolling(deviceId);
     } else if (!isOpen) {
+      console.log(
+        "🛑 LightingConfigModalEnhanced - Modal closed, stopping status polling"
+      );
       stopPolling();
     }
 
     return () => stopPolling();
-  }, [isOpen, deviceId, status, startPolling, stopPolling]);
+  }, [isOpen, deviceId, startPolling, stopPolling]);
 
   const showToastMessage = (
     message: string,
@@ -147,10 +159,18 @@ const LightingConfigModalEnhanced: React.FC<
       const success = await configureLighting(deviceId, config);
 
       if (success) {
-        showToastMessage("Lighting system configured successfully!", "success");
+        showToastMessage(
+          "Lighting system configured! Waiting for controller response...",
+          "success"
+        );
         setCurrentStep("monitor");
-        // Start polling to monitor the configuration
-        startPolling(deviceId, 2000); // Poll every 2 seconds initially
+        // Start polling with aggressive initial interval, then back off
+        startPolling(deviceId, 1000); // Poll every 1 second initially for faster response
+
+        // After 10 seconds, reduce polling frequency
+        setTimeout(() => {
+          startPolling(deviceId, 3000); // Back to normal 3-second polling
+        }, 10000);
       } else {
         showToastMessage(
           "Configuration failed. Please check your settings.",
@@ -218,6 +238,31 @@ const LightingConfigModalEnhanced: React.FC<
             >
               Continue to Configuration
             </IonButton>
+
+            {/* Debug: Show current status in select step */}
+            <div
+              style={{
+                marginTop: "16px",
+                padding: "12px",
+                backgroundColor: "var(--ion-color-light)",
+                borderRadius: "8px",
+                fontSize: "12px",
+              }}
+            >
+              <strong>🐛 Current Backend Status:</strong>
+              <br />
+              <strong>Status:</strong> {status?.lightingStatus || "Loading..."}
+              <br />
+              <strong>Configured:</strong>{" "}
+              {status?.lightingSystemConfigured ? "Yes" : "No"}
+              <br />
+              <strong>Last Test:</strong>{" "}
+              {status?.lightingLastTestAt
+                ? new Date(status.lightingLastTestAt).toLocaleTimeString()
+                : "Never"}
+              <br />
+              <strong>Polling:</strong> {isPolling ? "Active" : "Inactive"}
+            </div>
           </div>
         );
 
