@@ -235,8 +235,8 @@ const PaletteCreator: React.FC = () => {
       });
 
       showMessage(
-        `Palette sent to ${recipients.length} recipient${
-          recipients.length !== 1 ? "s" : ""
+        `Palette sent to ${friendIds.length} recipient${
+          friendIds.length !== 1 ? "s" : ""
         }!`
       );
 
