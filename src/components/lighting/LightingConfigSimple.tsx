@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   IonModal,
   IonHeader,
@@ -26,6 +26,7 @@ import {
 } from "../../services/LightingSystemService";
 import { LightingSystemConfigDto } from "../../services/openapi/models/LightingSystemConfigDto";
 import { DeviceAuthNotification } from "../notifications";
+import { useLightingStatus } from "../../hooks/api/useLightingStatus";
 
 interface LightingConfigSimpleProps {
   isOpen: boolean;
@@ -54,6 +55,9 @@ const LightingConfigSimple: React.FC<LightingConfigSimpleProps> = ({
   const [showAuthNotification, setShowAuthNotification] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
 
+  // Add status polling to see backend state
+  const { startPolling, stopPolling } = useLightingStatus();
+
   const resetForm = () => {
     setSystemType("");
   };
@@ -61,13 +65,20 @@ const LightingConfigSimple: React.FC<LightingConfigSimpleProps> = ({
   useEffect(() => {
     if (isOpen) {
       resetForm();
+      // Start polling to see current backend status
+      if (deviceId) {
+        startPolling(deviceId);
+      }
+    } else {
+      stopPolling();
     }
-  }, [isOpen]);
+    return () => stopPolling();
+  }, [isOpen, deviceId, startPolling, stopPolling]);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     resetForm();
     onClose();
-  };
+  }, [onClose]);
 
   const isFormValid = () => {
     if (!systemType) return false;
@@ -126,12 +137,17 @@ const LightingConfigSimple: React.FC<LightingConfigSimpleProps> = ({
     }
 
     setLoading(true);
+
     try {
       const config = buildConfiguration();
+
       await LightingSystemService.configureLightingSystem(deviceId, config);
 
       setToastMessage("Lighting system configured successfully!");
       setShowToast(true);
+
+      // Force refresh backend status after configuration
+      startPolling(deviceId, 1000); // Poll every 1 second for faster response
 
       // For Nanoleaf systems, start the authentication process
       if (systemType === "nanoleaf") {
@@ -169,6 +185,9 @@ const LightingConfigSimple: React.FC<LightingConfigSimpleProps> = ({
     setAlertMessage("Lighting system authentication failed. Please try again.");
     setShowAlert(true);
   };
+
+  // Note: Authentication completion is now handled by DeviceAuthNotification component
+  // through its internal REST API polling. No need for duplicate status handling here.
 
   const getSystemDescription = (
     type: LightingSystemConfigDto.lightingSystemType
@@ -655,6 +674,10 @@ const LightingConfigSimple: React.FC<LightingConfigSimpleProps> = ({
         color="success"
       />
 
+      {/* 
+        Note: Now using pure REST API polling for authentication - no WebSocket dependency.
+        The simplified component handles all authentication steps through backend polling.
+      */}
       <DeviceAuthNotification
         deviceId={deviceId}
         deviceName={deviceName}
@@ -663,8 +686,15 @@ const LightingConfigSimple: React.FC<LightingConfigSimpleProps> = ({
           setShowAuthNotification(false);
           setIsAuthenticating(false);
         }}
-        onSuccess={handleAuthSuccess}
-        onFailed={handleAuthFailed}
+        onSuccess={() => {
+          handleAuthSuccess();
+        }}
+        onFailed={() => {
+          handleAuthFailed();
+        }}
+        onRetry={() => {
+          // The component handles retry internally through polling
+        }}
       />
     </>
   );

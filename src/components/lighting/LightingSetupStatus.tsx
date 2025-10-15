@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   IonCard,
   IonCardHeader,
@@ -61,6 +61,8 @@ export const LightingSetupStatus: React.FC<LightingSetupStatusProps> = ({
   const [toastColor, setToastColor] = useState<
     "success" | "warning" | "danger"
   >("success");
+  const [actionInitiatedAt, setActionInitiatedAt] = useState<Date | null>(null);
+  const [ignoreStaleStatus, setIgnoreStaleStatus] = useState(false);
 
   useEffect(() => {
     if (autoStartPolling && deviceId) {
@@ -78,30 +80,107 @@ export const LightingSetupStatus: React.FC<LightingSetupStatusProps> = ({
     setShowToast(true);
   };
 
+  const isStatusStale = useCallback(
+    (currentStatus: LightingSystemStatusDto | null) => {
+      if (!currentStatus || !actionInitiatedAt) return false;
+
+      // If we have a lastTestAt timestamp, check if it's before our action
+      if (currentStatus.lightingLastTestAt) {
+        const lastTestTime = new Date(currentStatus.lightingLastTestAt);
+        return lastTestTime < actionInitiatedAt;
+      }
+
+      // If no timestamp, assume stale for 5 seconds after action
+      const now = new Date();
+      const timeSinceAction = now.getTime() - actionInitiatedAt.getTime();
+      return timeSinceAction < 5000; // 5 second grace period
+    },
+    [actionInitiatedAt]
+  );
+
+  // Reset stale status tracking when we get a fresh status
+  useEffect(() => {
+    if (status && actionInitiatedAt && !isStatusStale(status)) {
+      setIgnoreStaleStatus(false);
+      setActionInitiatedAt(null);
+    }
+  }, [status, actionInitiatedAt, isStatusStale]);
+
+  // Debug logging for status changes
+  useEffect(() => {
+    if (status) {
+      console.log("🔍 LightingSetupStatus - REST API Status Update:", {
+        deviceId,
+        lightingStatus: status.lightingStatus,
+        lightingSystemConfigured: status.lightingSystemConfigured,
+        lightingLastTestAt: status.lightingLastTestAt,
+        requiresAuthentication: status.requiresAuthentication,
+        actionInitiatedAt: actionInitiatedAt?.toISOString(),
+        isStale: actionInitiatedAt ? isStatusStale(status) : false,
+        ignoreStaleStatus,
+        fullStatus: status,
+      });
+    }
+  }, [status, deviceId, actionInitiatedAt, isStatusStale, ignoreStaleStatus]);
+
   const handleTestConnection = async () => {
     setTestInProgress(true);
+
+    console.log(
+      "🚀 handleTestConnection - Starting test for device:",
+      deviceId
+    );
+
+    // Mark when we initiated the action and ignore stale status temporarily
+    const actionTime = new Date();
+    setActionInitiatedAt(actionTime);
+    setIgnoreStaleStatus(true);
+
     try {
       const success = await testLighting(deviceId);
       if (success) {
         showToastMessage(
-          "Test initiated! Check status for results.",
+          "Test initiated! Waiting for controller response...",
           "success"
         );
-        // Start polling to catch the test results
+
+        console.log(
+          "✅ Test initiated successfully at:",
+          actionTime.toISOString()
+        );
+
+        // Force an immediate refresh to get current status
+        await refreshStatus();
+
+        // Start polling with shorter interval initially, then back off
         if (!isPolling) {
-          startPolling(deviceId, 2000); // Poll every 2 seconds during test
+          startPolling(deviceId, 1000); // Poll every 1 second initially for faster response
         }
+
+        // After 10 seconds, reduce polling frequency and stop ignoring stale status
+        setTimeout(() => {
+          console.log("⏰ 10-second timeout reached, resetting polling");
+          if (isPolling) {
+            startPolling(deviceId, 3000); // Back to normal 3-second polling
+          }
+          // Also stop ignoring stale status after reasonable time
+          setIgnoreStaleStatus(false);
+          setActionInitiatedAt(null);
+        }, 10000);
       } else {
         showToastMessage("Failed to initiate test", "danger");
+        setIgnoreStaleStatus(false);
+        setActionInitiatedAt(null);
       }
     } catch (err) {
       console.error("Test failed to start:", err);
       showToastMessage("Test failed to start", "danger");
+      setIgnoreStaleStatus(false);
+      setActionInitiatedAt(null);
     } finally {
       setTestInProgress(false);
     }
   };
-
   const handleStartMonitoring = () => {
     startPolling(deviceId, 3000);
     showToastMessage("Started monitoring lighting system status", "success");
@@ -115,18 +194,23 @@ export const LightingSetupStatus: React.FC<LightingSetupStatusProps> = ({
   const getStatusDisplay = () => {
     if (!status) return { text: "Unknown", color: "medium", icon: alertCircle };
 
+    // If we're ignoring stale status and current status appears stale, show waiting status
+    if (ignoreStaleStatus && isStatusStale(status)) {
+      return { text: "Waiting for Response", color: "warning", icon: time };
+    }
+
     switch (status.lightingStatus) {
-      case "working":
+      case LightingSystemStatusDto.lightingStatus.WORKING:
         return { text: "Working", color: "success", icon: checkmarkCircle };
-      case "error":
+      case LightingSystemStatusDto.lightingStatus.ERROR:
         return { text: "Error", color: "danger", icon: alertCircle };
-      case "authentication_required":
+      case LightingSystemStatusDto.lightingStatus.AUTHENTICATION_REQUIRED:
         return {
           text: "Authentication Required",
           color: "warning",
           icon: warning,
         };
-      case "unknown":
+      case LightingSystemStatusDto.lightingStatus.UNKNOWN:
       default:
         return { text: "Unknown", color: "medium", icon: alertCircle };
     }
@@ -147,7 +231,21 @@ export const LightingSetupStatus: React.FC<LightingSetupStatusProps> = ({
   const getNextAction = () => {
     if (!status) return null;
 
-    if (status.lightingStatus === "authentication_required") {
+    // If we're ignoring stale status and current status appears stale, show waiting message
+    if (ignoreStaleStatus && isStatusStale(status)) {
+      return {
+        text: "Processing...",
+        description:
+          "Waiting for the lighting controller to respond. This may take a few seconds.",
+        action: "wait",
+        color: "medium",
+      };
+    }
+
+    if (
+      status.lightingStatus ===
+      LightingSystemStatusDto.lightingStatus.AUTHENTICATION_REQUIRED
+    ) {
       return {
         text: "Authentication Required",
         description:
@@ -318,6 +416,13 @@ export const LightingSetupStatus: React.FC<LightingSetupStatusProps> = ({
                   View Authentication Steps
                 </IonButton>
               )}
+
+              {nextAction.action === "wait" && (
+                <IonButton expand="block" color="medium" disabled>
+                  <IonSpinner name="crescent" />
+                  <span style={{ marginLeft: "8px" }}>Processing...</span>
+                </IonButton>
+              )}
             </div>
           )}
 
@@ -356,6 +461,38 @@ export const LightingSetupStatus: React.FC<LightingSetupStatusProps> = ({
               <p style={{ marginTop: "16px" }}>Error: {error}</p>
             </IonText>
           )}
+
+          {/* Debug Panel */}
+          <div
+            style={{
+              marginTop: "16px",
+              padding: "12px",
+              backgroundColor: "var(--ion-color-light)",
+              borderRadius: "8px",
+              fontSize: "12px",
+            }}
+          >
+            <strong>🐛 Debug Info:</strong>
+            <br />
+            <strong>Action Initiated:</strong>{" "}
+            {actionInitiatedAt?.toLocaleTimeString() || "No"}
+            <br />
+            <strong>Ignoring Stale:</strong> {ignoreStaleStatus ? "Yes" : "No"}
+            <br />
+            <strong>Status Stale:</strong>{" "}
+            {status && actionInitiatedAt
+              ? isStatusStale(status)
+                ? "Yes"
+                : "No"
+              : "N/A"}
+            <br />
+            <strong>Last Test At:</strong>{" "}
+            {status?.lightingLastTestAt
+              ? new Date(status.lightingLastTestAt).toLocaleTimeString()
+              : "Never"}
+            <br />
+            <strong>Raw Status:</strong> {status?.lightingStatus || "None"}
+          </div>
         </IonCardContent>
       </IonCard>
 

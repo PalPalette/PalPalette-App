@@ -28,10 +28,15 @@ export const useLightingStatus = (
 
     try {
       setError(null);
+      console.log(
+        "🔄 useLightingStatus - Fetching status for device:",
+        targetDeviceId
+      );
       const newStatus =
         await DevicesService.devicesControllerGetLightingSystemStatus(
           targetDeviceId
         );
+      console.log("📡 useLightingStatus - API Response:", newStatus);
       setStatus(newStatus);
     } catch (err) {
       const errorMessage =

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef, memo } from "react";
 import {
   IonButton,
   IonCard,
@@ -27,15 +27,25 @@ import {
   informationCircle,
   power,
   refresh,
+  keypad,
 } from "ionicons/icons";
-import {
-  userNotificationService,
-  UserNotification,
-  NotificationAction,
-  DeviceAuthenticationState,
-} from "../../services/UserNotificationService";
 import { DevicesService } from "../../services/openapi/services/DevicesService";
 import { LightingSystemStatusDto } from "../../services/openapi/models/LightingSystemStatusDto";
+
+// Simplified authentication state based on REST API data
+interface AuthenticationState {
+  deviceId: string;
+  isAuthenticating: boolean;
+  currentStep:
+    | "press_power_button"
+    | "enter_pairing_code"
+    | "success"
+    | "failed"
+    | "waiting";
+  message: string;
+  pairingCode?: string;
+  lastUpdate: number;
+}
 
 interface DeviceAuthNotificationProps {
   deviceId: string;
@@ -56,246 +66,225 @@ const DeviceAuthNotification: React.FC<DeviceAuthNotificationProps> = ({
   onFailed,
   onRetry,
 }) => {
-  const [authState, setAuthState] = useState<DeviceAuthenticationState | null>(
-    null
-  );
+  const [authState, setAuthState] = useState<AuthenticationState | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [lightingStatus, setLightingStatus] =
     useState<LightingSystemStatusDto | null>(null);
   const [isPolling, setIsPolling] = useState(false);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const authStateRef = useRef<AuthenticationState | null>(null);
 
-  const handleNotification = useCallback(
-    (notification: UserNotification) => {
-      console.log("Received notification for device:", deviceId, notification);
+  // Update ref whenever authState changes
+  useEffect(() => {
+    authStateRef.current = authState;
+  }, [authState]);
 
-      // Update authentication state
-      const newState: DeviceAuthenticationState = {
-        deviceId: notification.deviceId,
-        isAuthenticating: true,
-        currentStep: notification.action,
-        message: notification.message,
-        pairingCode: notification.pairingCode,
-        lastUpdate: Date.now(),
-      };
-
-      setAuthState(newState);
-
-      // Handle specific actions
-      switch (notification.action) {
-        case NotificationAction.PRESS_POWER_BUTTON:
-          setToastMessage(
-            "Please press the power button on your lighting device"
-          );
-          setShowToast(true);
-          break;
-
-        case NotificationAction.ENTER_PAIRING_CODE:
-          if (notification.pairingCode) {
-            setToastMessage(`Pairing code: ${notification.pairingCode}`);
-            setShowToast(true);
-          }
-          break;
-
-        case NotificationAction.AUTHENTICATION_SUCCESS:
-          setToastMessage("Device connected successfully!");
-          setShowToast(true);
-          setTimeout(() => {
-            onSuccess?.();
-            onDismiss();
-          }, 2000);
-          break;
-
-        case NotificationAction.AUTHENTICATION_FAILED:
-          setToastMessage("Authentication failed. Please try again.");
-          setShowToast(true);
-          setTimeout(() => {
-            onFailed?.();
-          }, 3000);
-          break;
-      }
-    },
-    [deviceId, onSuccess, onFailed, onDismiss]
-  );
-
-  // Polling function to get lighting system status
+  // Pure REST API polling function
   const pollLightingStatus = useCallback(async () => {
     try {
       const status =
         await DevicesService.devicesControllerGetLightingSystemStatus(deviceId);
       setLightingStatus(status);
 
-      // Map lighting status to notification actions for UI consistency
+      // Handle different status states
       if (
-        status.lightingStatus ===
-          LightingSystemStatusDto.lightingStatus.WORKING ||
-        status.lightingSystemConfigured
+        status.lightingStatus === LightingSystemStatusDto.lightingStatus.WORKING
       ) {
-        const successNotification: UserNotification = {
+        // Authentication successful - only when status is explicitly 'working'
+        const newState: AuthenticationState = {
           deviceId,
-          action: NotificationAction.AUTHENTICATION_SUCCESS,
+          isAuthenticating: false,
+          currentStep: "success",
           message: "Device connected successfully!",
-          timestamp: Date.now(),
+          lastUpdate: Date.now(),
         };
-        handleNotification(successNotification);
+        setAuthState(newState);
+        setToastMessage("Device connected successfully!");
+        setShowToast(true);
+
+        // Stop polling and call success after a brief delay
         setIsPolling(false);
+        setTimeout(() => {
+          onSuccess?.();
+        }, 2000);
       } else if (
         status.lightingStatus === LightingSystemStatusDto.lightingStatus.ERROR
       ) {
-        const failedNotification: UserNotification = {
+        // Authentication failed
+
+        const newState: AuthenticationState = {
           deviceId,
-          action: NotificationAction.AUTHENTICATION_FAILED,
+          isAuthenticating: false,
+          currentStep: "failed",
           message: "Authentication failed. Please try again.",
-          timestamp: Date.now(),
+          lastUpdate: Date.now(),
         };
-        handleNotification(failedNotification);
+        setAuthState(newState);
+        setToastMessage("Authentication failed. Please try again.");
+        setShowToast(true);
+
         setIsPolling(false);
+        setTimeout(() => {
+          onFailed?.();
+        }, 3000);
       } else if (
         status.lightingStatus ===
-          LightingSystemStatusDto.lightingStatus.AUTHENTICATION_REQUIRED ||
-        (status.requiresAuthentication &&
-          status.lightingStatus ===
-            LightingSystemStatusDto.lightingStatus.UNKNOWN)
+        LightingSystemStatusDto.lightingStatus.AUTHENTICATION_REQUIRED
       ) {
-        // Check if we have pairing code in the status details
+        // Authentication explicitly required - determine step from backend data
         const pairingCode = status.lightingStatusDetails?.pairingCode;
         const authStep = status.lightingStatusDetails?.authStep;
 
-        let action: NotificationAction;
+        let currentStep: AuthenticationState["currentStep"];
         let message: string;
 
         if (pairingCode) {
-          action = NotificationAction.ENTER_PAIRING_CODE;
+          currentStep = "enter_pairing_code";
           message = "Enter the pairing code in your lighting app";
         } else if (authStep === "press_power_button" || !authStep) {
-          action = NotificationAction.PRESS_POWER_BUTTON;
+          currentStep = "press_power_button";
           message = "Press the power button on your device to start pairing";
         } else {
-          action = NotificationAction.PRESS_POWER_BUTTON;
+          currentStep = "waiting";
           message = "Authentication required - follow device instructions";
         }
 
-        const pairingNotification: UserNotification = {
+        const newState: AuthenticationState = {
           deviceId,
-          action,
+          isAuthenticating: true,
+          currentStep,
           message,
           pairingCode,
-          timestamp: Date.now(),
+          lastUpdate: Date.now(),
         };
-        handleNotification(pairingNotification);
+        setAuthState(newState);
+
+        // Show toast for step changes
+        if (
+          !authStateRef.current ||
+          authStateRef.current.currentStep !== currentStep
+        ) {
+          setToastMessage(message);
+          setShowToast(true);
+        }
+      } else if (
+        status.requiresAuthentication &&
+        status.lightingStatus ===
+          LightingSystemStatusDto.lightingStatus.UNKNOWN &&
+        status.lightingSystemConfigured
+      ) {
+        // System is configured but status is unknown and requires auth - wait for backend to determine next step
+        const newState: AuthenticationState = {
+          deviceId,
+          isAuthenticating: true,
+          currentStep: "waiting",
+          message: "Checking system status...",
+          lastUpdate: Date.now(),
+        };
+        setAuthState(newState);
+
+        // Don't show success toast in this case - just wait
       }
-    } catch (error) {
-      console.error("Failed to poll lighting status:", error);
-      // Don't stop polling on network errors, but show toast for user feedback
+    } catch {
       setToastMessage("Connection error - retrying...");
       setShowToast(true);
     }
-  }, [deviceId, handleNotification, setLightingStatus, setIsPolling]);
+  }, [deviceId, onSuccess, onFailed]); // Remove authState dependency to avoid loops
 
+  // Polling functions are now inlined in the useEffect to avoid dependency cycles
+
+  // Handle visibility changes - inline polling logic to avoid dependency cycles
   useEffect(() => {
-    if (!isVisible) return;
-
-    // Register for notifications for this device
-    userNotificationService.onAuthenticationNotification(
-      deviceId,
-      handleNotification
-    );
-
-    // Get initial state
-    const currentState =
-      userNotificationService.getAuthenticationState(deviceId);
-    if (currentState) {
-      setAuthState(currentState);
-    }
-
-    return () => {
-      userNotificationService.removeAuthenticationCallback(deviceId);
-    };
-  }, [deviceId, isVisible, handleNotification]);
-
-  // Separate useEffect for polling to avoid dependency issues
-  useEffect(() => {
-    if (!isVisible || !isPolling) return;
-
-    // Initial poll
-    pollLightingStatus();
-
-    const pollInterval = setInterval(() => {
-      pollLightingStatus();
-    }, 2000); // Poll every 2 seconds
-
-    return () => {
-      clearInterval(pollInterval);
-    };
-  }, [isVisible, isPolling, pollLightingStatus]);
-
-  // Start polling when modal becomes visible
-  useEffect(() => {
-    if (isVisible) {
-      setIsPolling(true);
+    if (isVisible && deviceId) {
+      if (!pollingIntervalRef.current) {
+        setIsPolling(true);
+        // Initial poll
+        pollLightingStatus();
+        // Set up interval
+        pollingIntervalRef.current = setInterval(() => {
+          pollLightingStatus();
+        }, 2000);
+      }
     } else {
-      setIsPolling(false);
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+        setIsPolling(false);
+      }
     }
-  }, [isVisible]);
 
-  const getStepIcon = (action: NotificationAction | null) => {
-    switch (action) {
-      case NotificationAction.PRESS_POWER_BUTTON:
+    // Cleanup when component unmounts or visibility changes
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+        setIsPolling(false);
+      }
+    };
+  }, [isVisible, deviceId, pollLightingStatus]);
+
+  const handleRetry = () => {
+    setAuthState(null);
+
+    // Restart polling inline
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+    }
+
+    setIsPolling(true);
+    pollLightingStatus();
+    pollingIntervalRef.current = setInterval(() => {
+      pollLightingStatus();
+    }, 2000);
+
+    onRetry?.();
+  };
+
+  const getStepIcon = (step: AuthenticationState["currentStep"] | null) => {
+    switch (step) {
+      case "press_power_button":
         return power;
-      case NotificationAction.ENTER_PAIRING_CODE:
-        return informationCircle;
-      case NotificationAction.AUTHENTICATION_SUCCESS:
+      case "enter_pairing_code":
+        return keypad;
+      case "success":
         return checkmarkCircle;
-      case NotificationAction.AUTHENTICATION_FAILED:
+      case "failed":
         return closeCircle;
       default:
-        return bulb;
+        return informationCircle;
     }
   };
 
-  const getStepColor = (action: NotificationAction | null) => {
-    switch (action) {
-      case NotificationAction.AUTHENTICATION_SUCCESS:
-        return "success";
-      case NotificationAction.AUTHENTICATION_FAILED:
-        return "danger";
-      case NotificationAction.PRESS_POWER_BUTTON:
-      case NotificationAction.ENTER_PAIRING_CODE:
+  const getStepColor = (step: AuthenticationState["currentStep"] | null) => {
+    switch (step) {
+      case "press_power_button":
+      case "enter_pairing_code":
+      case "waiting":
         return "warning";
+      case "success":
+        return "success";
+      case "failed":
+        return "danger";
       default:
-        return "primary";
+        return "medium";
     }
   };
 
-  const getProgressValue = (action: NotificationAction | null) => {
-    switch (action) {
-      case NotificationAction.PRESS_POWER_BUTTON:
-        return 0.33;
-      case NotificationAction.ENTER_PAIRING_CODE:
-        return 0.66;
-      case NotificationAction.AUTHENTICATION_SUCCESS:
+  const getProgressValue = (
+    step: AuthenticationState["currentStep"] | null
+  ) => {
+    switch (step) {
+      case "press_power_button":
+        return 0.3;
+      case "enter_pairing_code":
+        return 0.6;
+      case "success":
         return 1.0;
-      case NotificationAction.AUTHENTICATION_FAILED:
-        return 0.0;
+      case "failed":
+        return 0.1;
       default:
         return 0.1;
-    }
-  };
-
-  const getStatusDisplayText = (
-    status: LightingSystemStatusDto.lightingStatus
-  ) => {
-    switch (status) {
-      case LightingSystemStatusDto.lightingStatus.WORKING:
-        return "Connected and working";
-      case LightingSystemStatusDto.lightingStatus.ERROR:
-        return "Connection error";
-      case LightingSystemStatusDto.lightingStatus.AUTHENTICATION_REQUIRED:
-        return "Authentication needed";
-      case LightingSystemStatusDto.lightingStatus.UNKNOWN:
-        return "Checking connection...";
-      default:
-        return status;
     }
   };
 
@@ -304,188 +293,256 @@ const DeviceAuthNotification: React.FC<DeviceAuthNotificationProps> = ({
       <IonModal isOpen={isVisible} onDidDismiss={onDismiss}>
         <IonHeader>
           <IonToolbar>
-            <IonTitle>Connecting {deviceName}</IonTitle>
+            <IonTitle>Device Authentication</IonTitle>
             <IonButton
               slot="end"
               fill="clear"
               onClick={onDismiss}
-              disabled={
-                authState?.currentStep ===
-                NotificationAction.AUTHENTICATION_SUCCESS
-              }
+              style={{ marginRight: "8px" }}
             >
-              Close
+              <IonIcon icon={closeCircle} />
             </IonButton>
           </IonToolbar>
         </IonHeader>
 
         <IonContent className="ion-padding">
-          <IonCard>
-            <IonCardHeader>
-              <IonCardTitle>
-                <IonIcon
-                  icon={getStepIcon(authState?.currentStep || null)}
+          {/* Header Section */}
+          <div
+            style={{
+              textAlign: "center",
+              marginBottom: "32px",
+              paddingTop: "16px",
+            }}
+          >
+            <div
+              style={{
+                width: "80px",
+                height: "80px",
+                borderRadius: "20px",
+                background:
+                  "linear-gradient(135deg, var(--ion-color-primary), var(--ion-color-secondary))",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto 16px",
+                boxShadow: "0 8px 24px rgba(var(--ion-color-primary-rgb), 0.2)",
+              }}
+            >
+              <IonIcon
+                icon={bulb}
+                style={{
+                  fontSize: "40px",
+                  color: "white",
+                }}
+              />
+            </div>
+            <IonText>
+              <h2
+                style={{
+                  margin: "0 0 8px 0",
+                  fontSize: "24px",
+                  fontWeight: "700",
+                  color: "var(--ion-color-dark)",
+                }}
+              >
+                Connecting {deviceName}
+              </h2>
+              <p
+                style={{
+                  color: "var(--ion-color-medium)",
+                  fontSize: "16px",
+                  lineHeight: "1.5",
+                  margin: "0",
+                }}
+              >
+                Setting up your lighting system
+              </p>
+            </IonText>
+          </div>
+
+          {/* Progress Section */}
+          <IonCard style={{ marginBottom: "24px", borderRadius: "16px" }}>
+            <IonCardContent style={{ padding: "24px" }}>
+              <div style={{ marginBottom: "16px" }}>
+                <IonProgressBar
+                  value={getProgressValue(authState?.currentStep || null)}
                   color={getStepColor(authState?.currentStep || null)}
-                  style={{ marginRight: "8px" }}
+                  style={{ height: "8px", borderRadius: "4px" }}
                 />
-                Lighting System Setup
-              </IonCardTitle>
-            </IonCardHeader>
+              </div>
 
-            <IonCardContent>
-              {authState?.isAuthenticating && (
-                <>
-                  <IonProgressBar
-                    value={getProgressValue(authState.currentStep)}
-                    color={getStepColor(authState.currentStep)}
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "16px" }}
+              >
+                <div
+                  style={{
+                    width: "48px",
+                    height: "48px",
+                    borderRadius: "12px",
+                    background: `var(--ion-color-${getStepColor(
+                      authState?.currentStep || null
+                    )})`,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <IonIcon
+                    icon={getStepIcon(authState?.currentStep || null)}
+                    style={{ fontSize: "24px", color: "white" }}
                   />
-
-                  <div style={{ marginTop: "16px" }}>
-                    <IonText>
-                      <h3>{authState.message}</h3>
-                      {lightingStatus && (
-                        <p
-                          style={{
-                            fontSize: "0.9em",
-                            color: "var(--ion-color-medium)",
-                          }}
-                        >
-                          Status:{" "}
-                          {getStatusDisplayText(lightingStatus.lightingStatus)}
-                        </p>
-                      )}
-                    </IonText>
-
-                    {authState.currentStep ===
-                      NotificationAction.PRESS_POWER_BUTTON && (
-                      <IonList>
-                        <IonItem>
-                          <IonIcon icon={power} slot="start" color="warning" />
-                          <IonLabel className="ion-text-wrap">
-                            <h2>Press Power Button</h2>
-                            <p>
-                              Press and hold the power button on your Nanoleaf
-                              device for 5-7 seconds until it starts flashing
-                            </p>
-                          </IonLabel>
-                        </IonItem>
-                      </IonList>
-                    )}
-
-                    {authState.currentStep ===
-                      NotificationAction.ENTER_PAIRING_CODE &&
-                      authState.pairingCode && (
-                        <IonList>
-                          <IonItem>
-                            <IonIcon
-                              icon={informationCircle}
-                              slot="start"
-                              color="primary"
-                            />
-                            <IonLabel className="ion-text-wrap">
-                              <h2>Pairing Code Available</h2>
-                              <p>Use this code in your lighting app:</p>
-                              <IonChip
-                                color="primary"
-                                style={{ fontSize: "18px", fontWeight: "bold" }}
-                              >
-                                {authState.pairingCode}
-                              </IonChip>
-                            </IonLabel>
-                          </IonItem>
-                        </IonList>
-                      )}
-
-                    {authState.currentStep ===
-                      NotificationAction.AUTHENTICATION_SUCCESS && (
-                      <IonList>
-                        <IonItem>
-                          <IonIcon
-                            icon={checkmarkCircle}
-                            slot="start"
-                            color="success"
-                          />
-                          <IonLabel className="ion-text-wrap">
-                            <h2>Success!</h2>
-                            <p>
-                              Your lighting system has been connected
-                              successfully
-                            </p>
-                          </IonLabel>
-                        </IonItem>
-                      </IonList>
-                    )}
-
-                    {authState.currentStep ===
-                      NotificationAction.AUTHENTICATION_FAILED && (
-                      <IonList>
-                        <IonItem>
-                          <IonIcon
-                            icon={closeCircle}
-                            slot="start"
-                            color="danger"
-                          />
-                          <IonLabel className="ion-text-wrap">
-                            <h2>Connection Failed</h2>
-                            <p>
-                              Unable to connect to your lighting system. Please
-                              check your setup and try again.
-                            </p>
-                          </IonLabel>
-                        </IonItem>
-                        <IonItem>
-                          <IonButton
-                            expand="block"
-                            color="primary"
-                            onClick={() => {
-                              // Trigger retry logic here
-                              onRetry?.();
-                              setIsPolling(true);
-                              pollLightingStatus();
-                              setToastMessage("Retrying connection...");
-                              setShowToast(true);
-                            }}
-                          >
-                            <IonIcon icon={refresh} slot="start" />
-                            Retry Connection
-                          </IonButton>
-                        </IonItem>
-                      </IonList>
-                    )}
-
-                    {!authState.currentStep && (
-                      <div style={{ textAlign: "center", padding: "20px" }}>
-                        <IonSpinner name="crescent" />
-                        <IonText>
-                          <p>Initializing connection...</p>
-                        </IonText>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-
-              {!authState?.isAuthenticating && (
-                <div style={{ textAlign: "center", padding: "20px" }}>
-                  <IonIcon icon={bulb} size="large" color="medium" />
-                  <IonText>
-                    <p>
-                      {isPolling
-                        ? `Checking device status...${
-                            lightingStatus
-                              ? ` (${getStatusDisplayText(
-                                  lightingStatus.lightingStatus
-                                )})`
-                              : ""
-                          }`
-                        : "Waiting for device authentication to begin..."}
-                    </p>
-                  </IonText>
-                  {isPolling && <IonSpinner name="crescent" />}
                 </div>
-              )}
+                <div style={{ flex: 1 }}>
+                  <h3
+                    style={{
+                      margin: "0 0 4px 0",
+                      fontSize: "18px",
+                      fontWeight: "600",
+                      color: "var(--ion-color-dark)",
+                    }}
+                  >
+                    {authState?.currentStep === "press_power_button" &&
+                      "Press Power Button"}
+                    {authState?.currentStep === "enter_pairing_code" &&
+                      "Enter Pairing Code"}
+                    {authState?.currentStep === "success" &&
+                      "Connection Successful"}
+                    {authState?.currentStep === "failed" && "Connection Failed"}
+                    {(!authState?.currentStep ||
+                      authState?.currentStep === "waiting") &&
+                      "Initializing..."}
+                  </h3>
+                  <p
+                    style={{
+                      margin: "0",
+                      fontSize: "15px",
+                      color: "var(--ion-color-medium)",
+                      lineHeight: "1.4",
+                    }}
+                  >
+                    {authState?.message || "Preparing authentication..."}
+                  </p>
+                </div>
+              </div>
             </IonCardContent>
           </IonCard>
+
+          {/* Pairing Code Display */}
+          {authState?.currentStep === "enter_pairing_code" &&
+            authState?.pairingCode && (
+              <IonCard
+                style={{
+                  marginBottom: "24px",
+                  borderRadius: "16px",
+                  background: "rgba(var(--ion-color-warning-rgb), 0.1)",
+                }}
+              >
+                <IonCardHeader>
+                  <IonCardTitle
+                    style={{
+                      fontSize: "18px",
+                      color: "var(--ion-color-warning-shade)",
+                    }}
+                  >
+                    <IonIcon icon={keypad} style={{ marginRight: "8px" }} />
+                    Pairing Code
+                  </IonCardTitle>
+                </IonCardHeader>
+                <IonCardContent>
+                  <div
+                    style={{
+                      textAlign: "center",
+                      padding: "16px",
+                      borderRadius: "12px",
+                      background: "var(--ion-color-warning)",
+                      color: "white",
+                      fontSize: "32px",
+                      fontWeight: "bold",
+                      letterSpacing: "4px",
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    {authState.pairingCode}
+                  </div>
+                  <p
+                    style={{
+                      margin: "16px 0 0 0",
+                      textAlign: "center",
+                      fontSize: "14px",
+                      color: "var(--ion-color-medium)",
+                    }}
+                  >
+                    Enter this code in your lighting device's app
+                  </p>
+                </IonCardContent>
+              </IonCard>
+            )}
+
+          {/* Status Information */}
+          <IonList style={{ borderRadius: "16px", marginBottom: "24px" }}>
+            <IonItem>
+              <IonLabel>
+                <h3>Status</h3>
+                <p>{lightingStatus?.lightingStatus || "Checking..."}</p>
+              </IonLabel>
+              <IonChip
+                color={getStepColor(authState?.currentStep || null)}
+                slot="end"
+              >
+                {authState?.isAuthenticating ? "Active" : "Ready"}
+              </IonChip>
+            </IonItem>
+
+            {isPolling && (
+              <IonItem>
+                <IonLabel>
+                  <h3>Monitoring</h3>
+                  <p>Watching for device response...</p>
+                </IonLabel>
+                <IonSpinner name="dots" slot="end" />
+              </IonItem>
+            )}
+          </IonList>
+
+          {/* Action Buttons */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "12px",
+              marginTop: "32px",
+            }}
+          >
+            {authState?.currentStep === "failed" && (
+              <IonButton
+                expand="block"
+                size="large"
+                onClick={handleRetry}
+                style={{
+                  "--border-radius": "16px",
+                  height: "48px",
+                  fontWeight: "600",
+                }}
+              >
+                <IonIcon icon={refresh} slot="start" />
+                Try Again
+              </IonButton>
+            )}
+
+            <IonButton
+              expand="block"
+              fill="outline"
+              size="large"
+              onClick={onDismiss}
+              style={{
+                "--border-radius": "16px",
+                height: "48px",
+                fontWeight: "600",
+              }}
+            >
+              Close
+            </IonButton>
+          </div>
         </IonContent>
       </IonModal>
 
@@ -493,19 +550,11 @@ const DeviceAuthNotification: React.FC<DeviceAuthNotificationProps> = ({
         isOpen={showToast}
         onDidDismiss={() => setShowToast(false)}
         message={toastMessage}
-        duration={4000}
-        position="top"
-        color={
-          authState?.currentStep === NotificationAction.AUTHENTICATION_SUCCESS
-            ? "success"
-            : authState?.currentStep ===
-              NotificationAction.AUTHENTICATION_FAILED
-            ? "danger"
-            : "primary"
-        }
+        duration={3000}
+        position="bottom"
       />
     </>
   );
 };
 
-export default DeviceAuthNotification;
+export default memo(DeviceAuthNotification);
