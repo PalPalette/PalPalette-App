@@ -8,6 +8,7 @@ import type { Friendship } from '../models/Friendship';
 import type { Message } from '../models/Message';
 import type { MessageTimeframeResponseDto } from '../models/MessageTimeframeResponseDto';
 import type { RegisterUserDto } from '../models/RegisterUserDto';
+import type { ReplayMessageOnDeviceDto } from '../models/ReplayMessageOnDeviceDto';
 import type { RespondToFriendRequestDto } from '../models/RespondToFriendRequestDto';
 import type { SendFriendRequestDto } from '../models/SendFriendRequestDto';
 import type { SendPaletteToFriendsDto } from '../models/SendPaletteToFriendsDto';
@@ -285,11 +286,13 @@ export class UsersService {
     /**
      * Replay a message on a specific device
      * @param messageId Message ID to replay
+     * @param requestBody
      * @returns any Message replayed successfully
      * @throws ApiError
      */
     public static usersControllerReplayMessage(
         messageId: string,
+        requestBody: ReplayMessageOnDeviceDto,
     ): CancelablePromise<any> {
         return __request(OpenAPI, {
             method: 'POST',
@@ -297,6 +300,8 @@ export class UsersService {
             path: {
                 'messageId': messageId,
             },
+            body: requestBody,
+            mediaType: 'application/json',
             errors: {
                 400: `Bad request - validation error`,
                 401: `Unauthorized`,

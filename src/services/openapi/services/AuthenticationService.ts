@@ -122,20 +122,13 @@ export class AuthenticationService {
     }
     /**
      * Revoke access for a specific device
-     * @param requestBody
      * @returns any Device access revoked
      * @throws ApiError
      */
-    public static authControllerRevokeDevice(
-        requestBody: {
-            device_name: string;
-        },
-    ): CancelablePromise<any> {
+    public static authControllerRevokeDevice(): CancelablePromise<any> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/auth/revoke-device',
-            body: requestBody,
-            mediaType: 'application/json',
             errors: {
                 401: `Unauthorized`,
             },
@@ -146,7 +139,16 @@ export class AuthenticationService {
      * @returns any Active sessions retrieved
      * @throws ApiError
      */
-    public static authControllerGetActiveSessions(): CancelablePromise<any> {
+    public static authControllerGetActiveSessions(): CancelablePromise<{
+        sessions?: Array<{
+            id?: string;
+            deviceName?: string;
+            ipAddress?: string;
+            userAgent?: string;
+            createdAt?: string;
+            lastUsedAt?: string;
+        }>;
+    }> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/auth/sessions',

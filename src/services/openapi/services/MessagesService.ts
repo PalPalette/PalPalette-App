@@ -3,6 +3,8 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { CreateMessageDto } from '../models/CreateMessageDto';
+import type { MessageResponseDto } from '../models/MessageResponseDto';
+import type { ReplayMessageResponseDto } from '../models/ReplayMessageResponseDto';
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
@@ -10,12 +12,12 @@ export class MessagesService {
     /**
      * Create a new message
      * @param requestBody
-     * @returns any Message created successfully
+     * @returns MessageResponseDto Message created successfully
      * @throws ApiError
      */
     public static messagesControllerCreate(
         requestBody: CreateMessageDto,
-    ): CancelablePromise<any> {
+    ): CancelablePromise<MessageResponseDto> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/messages',
@@ -28,10 +30,10 @@ export class MessagesService {
     }
     /**
      * Get all messages (admin)
-     * @returns any All messages retrieved successfully
+     * @returns MessageResponseDto All messages retrieved successfully
      * @throws ApiError
      */
-    public static messagesControllerFindAll(): CancelablePromise<any> {
+    public static messagesControllerFindAll(): CancelablePromise<Array<MessageResponseDto>> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/messages',
@@ -40,12 +42,12 @@ export class MessagesService {
     /**
      * Get message by ID
      * @param id Message ID
-     * @returns any Message retrieved successfully
+     * @returns MessageResponseDto Message retrieved successfully
      * @throws ApiError
      */
     public static messagesControllerFindById(
         id: string,
-    ): CancelablePromise<any> {
+    ): CancelablePromise<MessageResponseDto> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/messages/{id}',
@@ -60,12 +62,12 @@ export class MessagesService {
     /**
      * Get messages for a specific recipient
      * @param recipientId Recipient user ID
-     * @returns any Messages retrieved successfully
+     * @returns MessageResponseDto Messages retrieved successfully
      * @throws ApiError
      */
     public static messagesControllerFindByRecipient(
         recipientId: string,
-    ): CancelablePromise<any> {
+    ): CancelablePromise<Array<MessageResponseDto>> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/messages/recipient/{recipientId}',
@@ -74,6 +76,29 @@ export class MessagesService {
             },
             errors: {
                 404: `Recipient not found`,
+            },
+        });
+    }
+    /**
+     * Replay a message on the user's lighting system
+     * Sends a previously received message to the user's lighting system for display. This is a deliberate action by the user to review a message, so it bypasses the user's configured messaging timeframe.
+     * @param id Message ID to replay
+     * @returns ReplayMessageResponseDto Message replayed successfully
+     * @returns any
+     * @throws ApiError
+     */
+    public static messagesControllerReplayMessage(
+        id: string,
+    ): CancelablePromise<ReplayMessageResponseDto | any> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/messages/{id}/replay',
+            path: {
+                'id': id,
+            },
+            errors: {
+                403: `Unauthorized - You can only replay messages sent to you`,
+                404: `Message not found`,
             },
         });
     }

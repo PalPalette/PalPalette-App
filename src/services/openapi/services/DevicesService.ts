@@ -4,10 +4,14 @@
 /* eslint-disable */
 import type { ClaimByCodeDto } from '../models/ClaimByCodeDto';
 import type { Device } from '../models/Device';
+import type { DevicePairingInfoDto } from '../models/DevicePairingInfoDto';
+import type { DiscoverUnpairedDevicesResponseDto } from '../models/DiscoverUnpairedDevicesResponseDto';
 import type { LightingSystemConfigDto } from '../models/LightingSystemConfigDto';
-import type { LightingSystemStatusDto } from '../models/LightingSystemStatusDto';
 import type { NotificationResponseDto } from '../models/NotificationResponseDto';
+import type { PairingCodeResponseDto } from '../models/PairingCodeResponseDto';
 import type { RegisterDeviceDto } from '../models/RegisterDeviceDto';
+import type { ResetDeviceResponseDto } from '../models/ResetDeviceResponseDto';
+import type { SupportedLightingSystemsResponseDto } from '../models/SupportedLightingSystemsResponseDto';
 import type { UpdateDeviceDto } from '../models/UpdateDeviceDto';
 import type { UpdateLightingSystemDto } from '../models/UpdateLightingSystemDto';
 import type { UpdateStatusDto } from '../models/UpdateStatusDto';
@@ -39,12 +43,12 @@ export class DevicesService {
     /**
      * Get pairing code for device
      * @param deviceId Device ID
-     * @returns any Pairing code retrieved successfully
+     * @returns PairingCodeResponseDto Pairing code retrieved successfully
      * @throws ApiError
      */
     public static devicesControllerGetPairingCode(
         deviceId: string,
-    ): CancelablePromise<any> {
+    ): CancelablePromise<PairingCodeResponseDto> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/devices/pairing-code/{deviceId}',
@@ -80,12 +84,12 @@ export class DevicesService {
     /**
      * Reset device to unclaimed state
      * @param id Device ID
-     * @returns any Device reset successfully
+     * @returns ResetDeviceResponseDto Device reset successfully
      * @throws ApiError
      */
     public static devicesControllerResetDevice(
         id: string,
-    ): CancelablePromise<any> {
+    ): CancelablePromise<ResetDeviceResponseDto> {
         return __request(OpenAPI, {
             method: 'DELETE',
             url: '/devices/{id}/reset',
@@ -146,10 +150,10 @@ export class DevicesService {
     }
     /**
      * Discover unpaired devices available for pairing
-     * @returns any List of discoverable unpaired devices
+     * @returns DiscoverUnpairedDevicesResponseDto List of discoverable unpaired devices
      * @throws ApiError
      */
-    public static devicesControllerDiscoverUnpairedDevices(): CancelablePromise<any> {
+    public static devicesControllerDiscoverUnpairedDevices(): CancelablePromise<DiscoverUnpairedDevicesResponseDto> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/devices/discover/unpaired',
@@ -166,18 +170,23 @@ export class DevicesService {
         });
     }
     /**
-     * @param deviceId
-     * @returns any
+     * Get pairing information for a specific device
+     * @param deviceId Device ID
+     * @returns DevicePairingInfoDto Device pairing information retrieved successfully
      * @throws ApiError
      */
     public static devicesControllerGetDevicePairingInfo(
         deviceId: string,
-    ): CancelablePromise<any> {
+    ): CancelablePromise<DevicePairingInfoDto> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/devices/{deviceId}/pairing-info',
             path: {
                 'deviceId': deviceId,
+            },
+            errors: {
+                400: `Device is already claimed`,
+                404: `Device not found`,
             },
         });
     }
@@ -235,18 +244,24 @@ export class DevicesService {
         });
     }
     /**
-     * @param id
-     * @returns Device
+     * Reset/clear lighting system configuration
+     * @param id Device ID
+     * @returns any Lighting system configuration cleared successfully
      * @throws ApiError
      */
     public static devicesControllerResetLightingSystem(
         id: string,
-    ): CancelablePromise<Device> {
+    ): CancelablePromise<any> {
         return __request(OpenAPI, {
             method: 'DELETE',
             url: '/devices/{id}/lighting',
             path: {
                 'id': id,
+            },
+            errors: {
+                401: `Unauthorized`,
+                403: `Forbidden - not device owner`,
+                404: `Device not found`,
             },
         });
     }
@@ -274,18 +289,24 @@ export class DevicesService {
         });
     }
     /**
-     * @param id
-     * @returns LightingSystemStatusDto
+     * Get lighting system status for a device
+     * @param id Device ID
+     * @returns any Lighting system status retrieved successfully
      * @throws ApiError
      */
     public static devicesControllerGetLightingSystemStatus(
         id: string,
-    ): CancelablePromise<LightingSystemStatusDto> {
+    ): CancelablePromise<any> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/devices/{id}/lighting/status',
             path: {
                 'id': id,
+            },
+            errors: {
+                401: `Unauthorized`,
+                403: `Forbidden - not device owner`,
+                404: `Device not found`,
             },
         });
     }
@@ -305,33 +326,39 @@ export class DevicesService {
         });
     }
     /**
-     * @returns LightingSystemStatusDto
+     * Get lighting system configurations for all user's devices
+     * @returns any Lighting system configurations retrieved successfully for all user devices
      * @throws ApiError
      */
-    public static devicesControllerGetMyDevicesLightingSystems(): CancelablePromise<Array<LightingSystemStatusDto>> {
+    public static devicesControllerGetMyDevicesLightingSystems(): CancelablePromise<any> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/devices/my-devices/lighting-systems',
+            errors: {
+                401: `Unauthorized`,
+            },
         });
     }
     /**
-     * @returns any
+     * Get list of supported lighting systems and their capabilities
+     * @returns SupportedLightingSystemsResponseDto Supported lighting systems and capabilities retrieved
      * @throws ApiError
      */
-    public static devicesControllerGetSupportedLightingSystems(): CancelablePromise<any> {
+    public static devicesControllerGetSupportedLightingSystems(): CancelablePromise<SupportedLightingSystemsResponseDto> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/devices/lighting/supported-systems',
         });
     }
     /**
-     * @param systemType
-     * @returns any
+     * Get default configuration for a specific lighting system type
+     * @param systemType Type of lighting system
+     * @returns any Default configuration retrieved successfully
      * @throws ApiError
      */
     public static devicesControllerGetDefaultLightingConfig(
-        systemType: string,
-    ): CancelablePromise<Record<string, any>> {
+        systemType: 'nanoleaf' | 'wled' | 'ws2812' | 'philips_hue',
+    ): CancelablePromise<any> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/devices/lighting/{systemType}/default-config',
