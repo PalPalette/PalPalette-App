@@ -36,7 +36,6 @@
   "dependencies": {
     "@capacitor/android": "7.4.2",
     "@capacitor/app": "7.0.1",
-    "@capacitor/barcode-scanner": "^2.0.3",
     "@capacitor/camera": "^7.0.1",
     "@capacitor/core": "7.4.2",
     "@capacitor/device": "^7.0.2",
@@ -52,6 +51,7 @@
     "@types/react-router": "^5.1.20",
     "@types/react-router-dom": "^5.3.3",
     "colorthief": "^2.6.0",
+    "dotenv": "^17.2.3",
     "ionicons": "^7.4.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",

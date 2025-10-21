@@ -14,9 +14,6 @@ const config: CapacitorConfig = {
     Preferences: {
       group: "palpalette",
     },
-    BarcodeScanner: {
-      permissions: ["camera"],
-    },
     Haptics: {},
     StatusBar: {
       style: "dark",

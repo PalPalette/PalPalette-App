@@ -21,7 +21,15 @@ import {
   globe,
   trash,
 } from "ionicons/icons";
-import { enhancedApiClient, Session } from "../../services/enhanced-api-client";
+// TODO: Session management removed for simplification - add back if needed
+// import { enhancedApiClient, Session } from "../../services/enhanced-api-client";
+
+interface Session {
+  deviceName?: string;
+  ipAddress?: string;
+  createdAt: string;
+  lastUsedAt?: string;
+}
 
 interface SessionManagerProps {
   className?: string;
@@ -45,8 +53,11 @@ export const SessionManager: React.FC<SessionManagerProps> = ({
     try {
       setIsLoading(true);
       setError(null);
-      const sessionsData = await enhancedApiClient.getActiveSessions();
-      setSessions(sessionsData);
+      // TODO: Re-implement with AuthenticationService if needed
+      // const sessionsData = await enhancedApiClient.getActiveSessions();
+      // setSessions(sessionsData);
+      setSessions([]); // Empty for now
+      setError("Session management temporarily disabled");
     } catch (error: unknown) {
       console.error("Failed to load sessions:", error);
       const errorMessage =
@@ -69,7 +80,9 @@ export const SessionManager: React.FC<SessionManagerProps> = ({
 
     try {
       setRevoking(deviceToRevoke);
-      await enhancedApiClient.revokeDeviceAccess(deviceToRevoke);
+      // TODO: Re-implement with AuthenticationService if needed
+      // await enhancedApiClient.revokeDeviceAccess(deviceToRevoke);
+      console.log("Device revocation temporarily disabled");
 
       // Reload sessions after successful revocation
       await loadSessions();
