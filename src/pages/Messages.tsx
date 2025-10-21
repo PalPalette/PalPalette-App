@@ -6,8 +6,6 @@ import {
   IonTitle,
   IonToolbar,
   IonList,
-  IonItem,
-  IonLabel,
   IonButton,
   IonRefresher,
   IonRefresherContent,
@@ -16,44 +14,39 @@ import {
   IonCardHeader,
   IonCardTitle,
   IonToast,
-  IonSelect,
-  IonSelectOption,
   IonIcon,
   IonChip,
   IonSkeletonText,
   RefresherEventDetail,
 } from "@ionic/react";
-import { colorPalette, play, time, person, tvOutline } from "ionicons/icons";
-import { Message } from "../services/openapi/models/Message";
-import { Device } from "../services/openapi/models/Device";
-import { DevicesService } from "../services/openapi/services/DevicesService";
+import { colorPalette, play, time, person } from "ionicons/icons";
+import { MessageResponseDto } from "../services/openapi/models/MessageResponseDto";
+import { MessagesService } from "../services/openapi/services/MessagesService";
+import { useAuth } from "../hooks/useAuth";
 import "./Messages.css";
 
 const Messages: React.FC = () => {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [devices, setDevices] = useState<Device[]>([]);
+  const { user } = useAuth();
+  const [messages, setMessages] = useState<MessageResponseDto[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDevice, setSelectedDevice] = useState<string>("");
+  const [replayingMessageId, setReplayingMessageId] = useState<string | null>(
+    null
+  );
   const [toastMessage, setToastMessage] = useState<string>("");
   const [showToast, setShowToast] = useState(false);
 
   useEffect(() => {
     const loadDataCallback = async () => {
+      if (!user?.id) {
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
-        const [messagesData, devicesData] = await Promise.all([
-          // TODO: Implement proper message fetching with OpenAPI
-          Promise.resolve([]), // MessagesService.messagesControllerFindAll(),
-          DevicesService.devicesControllerGetMyDevices(),
-        ]);
-
-        setMessages(messagesData as Message[]);
-        setDevices(devicesData as Device[]);
-
-        // Auto-select first device if available
-        if (devicesData.length > 0 && !selectedDevice) {
-          setSelectedDevice(devicesData[0].id);
-        }
+        const messagesData =
+          await MessagesService.messagesControllerFindByRecipient(user.id);
+        setMessages(messagesData);
       } catch (error) {
         console.error("Error loading data:", error);
         showMessage("Failed to load messages");
@@ -63,24 +56,18 @@ const Messages: React.FC = () => {
     };
 
     loadDataCallback();
-  }, [selectedDevice]);
+  }, [user]);
 
   const loadData = async () => {
+    if (!user?.id) {
+      return;
+    }
+
     try {
       setLoading(true);
-      const [messagesData, devicesData] = await Promise.all([
-        // TODO: Implement proper message fetching with OpenAPI
-        Promise.resolve([]), // MessagesService.messagesControllerFindAll(),
-        DevicesService.devicesControllerGetMyDevices(),
-      ]);
-
-      setMessages(messagesData as Message[]);
-      setDevices(devicesData as Device[]);
-
-      // Auto-select first device if available
-      if (devicesData.length > 0 && !selectedDevice) {
-        setSelectedDevice(devicesData[0].id);
-      }
+      const messagesData =
+        await MessagesService.messagesControllerFindByRecipient(user.id);
+      setMessages(messagesData);
     } catch (error) {
       console.error("Error loading data:", error);
       showMessage("Failed to load messages");
@@ -95,21 +82,22 @@ const Messages: React.FC = () => {
   };
 
   const replayMessage = async (messageId: string) => {
-    if (!selectedDevice) {
-      showMessage("Please select a device first");
-      return;
-    }
-
     try {
-      // TODO: Implement message replay with OpenAPI
-      console.warn("Message replay not implemented with OpenAPI yet", {
-        messageId,
-        selectedDevice,
-      });
-      showMessage("Message replay feature not available yet");
+      setReplayingMessageId(messageId);
+      const response = await MessagesService.messagesControllerReplayMessage(
+        messageId
+      );
+
+      if (response.success) {
+        showMessage(response.message || "Message replayed successfully!");
+      } else {
+        showMessage(response.message || "Failed to replay message");
+      }
     } catch (error) {
       console.error("Error replaying message:", error);
-      showMessage("Failed to replay message");
+      showMessage("Failed to replay message. Please try again.");
+    } finally {
+      setReplayingMessageId(null);
     }
   };
 
@@ -133,17 +121,37 @@ const Messages: React.FC = () => {
     }
   };
 
-  const renderColorPalette = (colors: Array<Record<string, any>>) => {
+  const renderColorPalette = (colors: string[] | Array<{ hex: string }>) => {
+    if (!colors || colors.length === 0) {
+      return (
+        <div className="color-palette-preview">
+          <div className="empty-colors">No colors available</div>
+        </div>
+      );
+    }
+
     return (
       <div className="color-palette-preview">
-        {colors.slice(0, 6).map((color, index) => (
-          <div
-            key={index}
-            className="color-swatch"
-            style={{ backgroundColor: color.hex || "#000000" }}
-            title={color.hex || "#000000"}
-          />
-        ))}
+        {colors.slice(0, 6).map((color, index) => {
+          // Handle both string format and object format {hex: string}
+          let colorValue: string;
+          if (typeof color === "string") {
+            colorValue = color.startsWith("#") ? color : `#${color}`;
+          } else if (color && typeof color === "object" && "hex" in color) {
+            colorValue = color.hex;
+          } else {
+            colorValue = "#000000";
+          }
+
+          return (
+            <div
+              key={index}
+              className="color-swatch"
+              style={{ backgroundColor: colorValue }}
+              title={colorValue}
+            />
+          );
+        })}
         {colors.length > 6 && (
           <div className="color-count">+{colors.length - 6}</div>
         )}
@@ -184,27 +192,6 @@ const Messages: React.FC = () => {
         <IonRefresher slot="fixed" onIonRefresh={handleRefresh}>
           <IonRefresherContent></IonRefresherContent>
         </IonRefresher>
-
-        {/* Device Selection */}
-        {devices.length > 0 && (
-          <div className="device-selection">
-            <IonItem>
-              <IonIcon icon={tvOutline} slot="start" />
-              <IonLabel>Replay on device:</IonLabel>
-              <IonSelect
-                value={selectedDevice}
-                placeholder="Select device"
-                onIonChange={(e) => setSelectedDevice(e.detail.value as string)}
-              >
-                {devices.map((device) => (
-                  <IonSelectOption key={device.id} value={device.id}>
-                    {device.name} ({device.type})
-                  </IonSelectOption>
-                ))}
-              </IonSelect>
-            </IonItem>
-          </div>
-        )}
 
         {loading ? (
           renderSkeletonLoader()
@@ -257,10 +244,12 @@ const Messages: React.FC = () => {
                         expand="block"
                         fill="outline"
                         onClick={() => replayMessage(message.id)}
-                        disabled={!selectedDevice}
+                        disabled={replayingMessageId === message.id}
                       >
                         <IonIcon icon={play} slot="start" />
-                        Show on Device
+                        {replayingMessageId === message.id
+                          ? "Replaying..."
+                          : "Show on Device"}
                       </IonButton>
                     </div>
                   </div>
