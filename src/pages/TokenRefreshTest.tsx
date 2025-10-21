@@ -18,10 +18,9 @@ import {
 } from "@ionic/react";
 import { AuthContext } from "../contexts/AuthContext";
 import { DevicesService } from "../services/openapi/services/DevicesService";
-import { enhancedApiClient } from "../services/enhanced-api-client";
 
 const TokenRefreshTest: React.FC = () => {
-  const { user, token, refreshToken, isAuthenticated } =
+  const { user, token, refreshToken, isAuthenticated, refreshTokens } =
     useContext(AuthContext)!;
   const [testResults, setTestResults] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -76,13 +75,12 @@ const TokenRefreshTest: React.FC = () => {
     setLoading(true);
     try {
       addTestResult("🔄 Testing manual token refresh...");
-      const newToken = await enhancedApiClient.refreshAccessToken();
-      addTestResult(
-        `✅ Token refresh succeeded - new token: ${newToken.substring(
-          0,
-          20
-        )}...`
-      );
+      const success = await refreshTokens();
+      if (success) {
+        addTestResult("✅ Token refresh succeeded via AuthContext");
+      } else {
+        addTestResult("❌ Token refresh failed via AuthContext");
+      }
     } catch (error) {
       addTestResult(
         `❌ Token refresh failed: ${

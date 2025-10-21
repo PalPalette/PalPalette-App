@@ -29,33 +29,34 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
 }) => {
   const [colors, setColors] = useState<string[]>(["#FF5733", "#33FF57"]);
   const [customColor, setCustomColor] = useState("#3357FF");
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
-  // Predefined color palette suggestions
+  // Predefined color palette suggestions - more diverse and distinct colors
   const presetColors = [
-    "#FF5733",
-    "#33FF57",
-    "#3357FF",
-    "#FF33F1",
-    "#F1FF33",
-    "#33FFF1",
-    "#FF8C33",
-    "#8C33FF",
-    "#33FF8C",
-    "#FF3333",
-    "#33FFFF",
-    "#FFFF33",
-    "#FF6B6B",
-    "#4ECDC4",
-    "#45B7D1",
-    "#96CEB4",
-    "#FFEAA7",
-    "#DDA0DD",
-    "#98D8C8",
-    "#F7DC6F",
-    "#BB8FCE",
-    "#85C1E9",
-    "#F8C471",
-    "#82E0AA",
+    "#E63946", // Red
+    "#F77F00", // Orange
+    "#FCBF49", // Yellow
+    "#06D6A0", // Mint
+    "#118AB2", // Blue
+    "#073B4C", // Dark Blue
+    "#9D4EDD", // Purple
+    "#FF006E", // Hot Pink
+    "#8338EC", // Violet
+    "#3A86FF", // Bright Blue
+    "#FB5607", // Burnt Orange
+    "#FFBE0B", // Golden Yellow
+    "#06FFA5", // Neon Green
+    "#1B9AAA", // Teal
+    "#EF476F", // Pink Red
+    "#FFD60A", // Bright Yellow
+    "#06A77D", // Sea Green
+    "#001845", // Navy
+    "#D00000", // Crimson
+    "#FCA311", // Amber
+    "#14213D", // Dark Navy
+    "#A7C957", // Lime
+    "#F72585", // Magenta
+    "#4CC9F0", // Sky Blue
   ];
 
   const addColor = (color?: string) => {
@@ -91,6 +92,32 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
     if (!showConfirmButton) {
       onColorsSelected(newColors);
     }
+  };
+
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+
+    const newColors = [...colors];
+    const draggedColor = newColors[draggedIndex];
+    newColors.splice(draggedIndex, 1);
+    newColors.splice(index, 0, draggedColor);
+
+    setColors(newColors);
+    setDraggedIndex(index);
+
+    // Only call onColorsSelected if showConfirmButton is false (immediate mode)
+    if (!showConfirmButton) {
+      onColorsSelected(newColors);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
   };
 
   const confirmSelection = () => {
@@ -139,7 +166,13 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
                   key={index}
                   style={{ padding: "4px" }}
                 >
-                  <div style={{ position: "relative" }}>
+                  <div
+                    style={{ position: "relative", cursor: "grab" }}
+                    draggable
+                    onDragStart={() => handleDragStart(index)}
+                    onDragOver={(e) => handleDragOver(e, index)}
+                    onDragEnd={handleDragEnd}
+                  >
                     <input
                       type="color"
                       value={color}
@@ -164,6 +197,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
                         textAlign: "center",
                         borderRadius: "4px",
                         padding: "2px",
+                        pointerEvents: "none",
                       }}
                     >
                       {color}
@@ -186,7 +220,12 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
                         }}
                         onClick={() => removeColor(index)}
                       >
-                        <IonIcon icon={remove} style={{ fontSize: "14px" }} />
+                        <IonIcon
+                          slot="icon-only"
+                          icon={remove}
+                          color="danger"
+                          style={{ fontSize: "14px" }}
+                        />
                       </IonButton>
                     )}
                   </div>
@@ -273,9 +312,9 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
         <div style={{ marginTop: "16px", textAlign: "center" }}>
           <IonText color="medium">
             <p style={{ fontSize: "14px", margin: "8px 0" }}>
-              💡 Tap a color square to edit it, or use the color presets below.
-              You need at least {minColors} colors and can have up to{" "}
-              {maxColors}.
+              💡 Tap a color to edit it, or drag to reorder. Use presets below
+              for quick selection. You need at least {minColors} colors and can
+              have up to {maxColors}.
             </p>
           </IonText>
         </div>

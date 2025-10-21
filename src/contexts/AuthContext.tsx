@@ -5,10 +5,7 @@ import React, {
   ReactNode,
   useCallback,
 } from "react";
-import {
-  enhancedApiClient,
-  LoginCredentials,
-} from "../services/enhanced-api-client";
+import { AuthenticationService } from "../services/openapi";
 import { SecureStorageService } from "../services/secure-storage.service";
 
 export interface User {
@@ -94,9 +91,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
    */
   const refreshUser = useCallback(async (): Promise<void> => {
     try {
-      const userData = await enhancedApiClient.getUser();
+      const userData = await SecureStorageService.getUser();
       if (userData && userData.id && userData.email && userData.displayName) {
-        setUser(userData);
+        setUser({
+          id: userData.id as string,
+          email: userData.email as string,
+          displayName: userData.displayName as string,
+        });
       }
     } catch (error) {
       console.error("❌ Failed to refresh user data:", error);
@@ -104,15 +105,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   /**
-   * Refresh access tokens
+   * Refresh access tokens - now handled automatically by HTTP interceptor
    */
   const refreshTokens = useCallback(async (): Promise<boolean> => {
     try {
-      const newAccessToken = await enhancedApiClient.refreshAccessToken();
-      const newRefreshToken = enhancedApiClient.getRefreshToken();
+      const { refreshToken: currentRefreshToken } =
+        await SecureStorageService.getTokens();
 
-      setToken(newAccessToken);
-      setRefreshToken(newRefreshToken);
+      if (!currentRefreshToken) {
+        throw new Error("No refresh token available");
+      }
+
+      const userAgent = navigator.userAgent || "PalPalette-App";
+      const response = await AuthenticationService.authControllerRefresh(
+        userAgent,
+        { refresh_token: currentRefreshToken }
+      );
+
+      // Store new tokens
+      await SecureStorageService.storeTokens(
+        response.access_token,
+        response.refresh_token
+      );
+      await SecureStorageService.storeUser(response.user);
+
+      setToken(response.access_token);
+      setRefreshToken(response.refresh_token);
 
       console.log("✅ Tokens refreshed successfully");
       return true;
@@ -135,13 +153,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setLoading(true);
 
-      const credentials: LoginCredentials = {
+      const userAgent = navigator.userAgent || "PalPalette-App";
+      const loginData = {
         email,
         password,
-        device_name: deviceName,
+        device_name: deviceName || "Mobile App",
       };
 
-      const response = await enhancedApiClient.login(credentials);
+      const response = await AuthenticationService.authControllerLogin(
+        userAgent,
+        loginData
+      );
+
+      // Store tokens and user data
+      await SecureStorageService.storeTokens(
+        response.access_token,
+        response.refresh_token
+      );
+      await SecureStorageService.storeUser(response.user);
 
       const userData = response.user;
       if (userData.id && userData.email && userData.displayName) {
@@ -228,7 +257,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = async (): Promise<void> => {
     try {
       setLoading(true);
-      await enhancedApiClient.logout();
+
+      // Try to call logout endpoint if we have a token
+      const { accessToken } = await SecureStorageService.getTokens();
+      if (accessToken) {
+        try {
+          await AuthenticationService.authControllerLogout();
+        } catch (error) {
+          console.warn("Logout request failed:", error);
+        }
+      }
+
+      // Always clear local data
+      await SecureStorageService.clearTokens();
       setToken(null);
       setRefreshToken(null);
       setUser(null);
@@ -244,7 +285,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     loadStoredAuth();
 
-    // Set up session expired event listener
+    // Set up session expired event listener for HTTP interceptor
     const handleSessionExpired = () => {
       console.log("🚪 Session expired automatically - logging out user");
       setToken(null);
@@ -253,9 +294,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     window.addEventListener("auth:sessionExpired", handleSessionExpired);
-
-    // Legacy callback for compatibility
-    enhancedApiClient.setOnSessionExpiredCallback(handleSessionExpired);
 
     return () => {
       window.removeEventListener("auth:sessionExpired", handleSessionExpired);

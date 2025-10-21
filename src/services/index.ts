@@ -10,22 +10,8 @@ export {
   userNotificationService,
 } from "./UserNotificationService";
 
-// API configuration - enhanced client with session management
-export {
-  enhancedApiClient,
-  configureApiClient,
-  setApiToken,
-  clearApiToken,
-  getApiToken,
-} from "./enhanced-api-client";
-
-// Legacy API configuration (for backward compatibility)
-export {
-  configureApiClient as configureApiClientLegacy,
-  setApiToken as setApiTokenLegacy,
-  clearApiToken as clearApiTokenLegacy,
-  getApiToken as getApiTokenLegacy,
-} from "./api-config";
+// API configuration - simple OpenAPI setup
+export { setupServices } from "./setupServices";
 
 // Generated OpenAPI services - use these directly!
 export {
@@ -46,14 +32,6 @@ export type {
   NotificationAction,
   DeviceAuthenticationState,
 } from "./UserNotificationService";
-
-// Enhanced API client types
-export type {
-  LoginCredentials,
-  AuthTokens,
-  UserData,
-  Session,
-} from "./enhanced-api-client";
 
 // Re-export common generated types for convenience
 export type {

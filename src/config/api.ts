@@ -6,7 +6,7 @@ const getEnvironmentConfig = () => {
   if (isVite) {
     // Vite environment - use import.meta.env
     return {
-      BASE_URL: import.meta.env.VITE_API_BASE_URL || "http://localhost:3000",
+      BASE_URL: import.meta.env.VITE_BACKEND_URL || "http://localhost:3000",
       WEBSOCKET_URL:
         import.meta.env.VITE_WEBSOCKET_URL || "http://localhost:3001",
       ENVIRONMENT: import.meta.env.VITE_ENVIRONMENT || "development",
@@ -14,13 +14,14 @@ const getEnvironmentConfig = () => {
       LOG_LEVEL: import.meta.env.VITE_LOG_LEVEL || "debug",
     };
   } else {
-    // Capacitor/native environment - fallback to production values
+    // Capacitor/native environment - use the same development server for now
+    // This ensures Android can reach your development backend
     return {
-      BASE_URL: "http://cides06.gm.fh-koeln.de:3000",
-      WEBSOCKET_URL: "http://cides06.gm.fh-koeln.de:3001",
-      ENVIRONMENT: "production",
-      DEBUG_MODE: false,
-      LOG_LEVEL: "error",
+      BASE_URL: "http://192.168.178.66:3000",
+      WEBSOCKET_URL: "http://192.168.178.66:3001",
+      ENVIRONMENT: "mobile-dev",
+      DEBUG_MODE: true,
+      LOG_LEVEL: "debug",
     };
   }
 };

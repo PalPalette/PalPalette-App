@@ -75,7 +75,7 @@ const LoginPage: React.FC = () => {
   // Redirect if user is already authenticated
   useEffect(() => {
     if (user && router) {
-      router.push("/dashboard", "root", "replace");
+      router.push("/devices", "root", "replace");
     }
   }, [user, router]);
 
