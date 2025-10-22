@@ -1,11 +1,39 @@
 import type { LightingSystemConfigDto } from "./openapi/models/LightingSystemConfigDto";
-import type { LightingSystemStatusDto } from "./openapi/models/LightingSystemStatusDto";
 import type { UpdateLightingSystemDto } from "./openapi/models/UpdateLightingSystemDto";
 import type { Device } from "./openapi/models/Device";
 
 // Re-export types for convenience
 export type LightingSystemConfig = LightingSystemConfigDto;
-export type LightingSystemStatus = LightingSystemStatusDto;
+export interface LightingSystemStatus {
+  lightingStatus: LightingStatus;
+  lightingSystemConfigured?: boolean;
+  lightingSystemType?: string;
+  lightingHostAddress?: string;
+  lightingPort?: number;
+  lightingLastTestAt?: string;
+  requiresAuthentication?: boolean;
+  // optional real-time hints
+  isReady?: boolean;
+  hasLightingSystem?: boolean;
+  lastUpdated?: string;
+  lightingStatusDetails?: Record<string, unknown> & {
+    pairingCode?: string;
+    authStep?: string;
+  };
+}
+
+export enum LightingStatus {
+  WORKING = "working",
+  ERROR = "error",
+  AUTHENTICATION_REQUIRED = "authentication_required",
+  UNKNOWN = "unknown",
+}
+
+export type OpenApiLightingType =
+  | "nanoleaf"
+  | "wled"
+  | "ws2812"
+  | "philips_hue";
 export type LightingConfig = LightingSystemConfigDto;
 export type LightingSystemType = string;
 
@@ -56,7 +84,7 @@ export class LightingSystemService {
         "./openapi/services/DevicesService"
       );
       return await DevicesService.devicesControllerGetDefaultLightingConfig(
-        systemType
+        systemType as OpenApiLightingType
       );
     } catch (error) {
       console.error("Error fetching default config:", error);
@@ -111,7 +139,7 @@ export class LightingSystemService {
    */
   static async getLightingSystemStatus(
     deviceId: string
-  ): Promise<LightingSystemStatusDto> {
+  ): Promise<LightingSystemStatus> {
     try {
       const { DevicesService } = await import(
         "./openapi/services/DevicesService"
@@ -160,9 +188,7 @@ export class LightingSystemService {
   /**
    * Get lighting systems for all user devices
    */
-  static async getAllDevicesLightingSystems(): Promise<
-    LightingSystemStatusDto[]
-  > {
+  static async getAllDevicesLightingSystems(): Promise<LightingSystemStatus[]> {
     try {
       const { DevicesService } = await import(
         "./openapi/services/DevicesService"

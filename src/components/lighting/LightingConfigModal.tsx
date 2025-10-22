@@ -45,13 +45,7 @@ import {
 import { LightingSystemConfigDto } from "../../services/openapi/models/LightingSystemConfigDto";
 import { useLighting, useToast, useLoading } from "../../hooks";
 
-interface CustomConfig {
-  ledPin?: number;
-  ledCount?: number;
-  brightness?: number;
-  port?: number;
-  [key: string]: unknown;
-}
+// Note: Custom per-system config is kept inside lightingCustomConfig as a generic object
 
 interface LightingConfigModalProps {
   isOpen: boolean;
@@ -88,13 +82,7 @@ const LightingConfigModal: React.FC<LightingConfigModalProps> = ({
   const [alertMessage, setAlertMessage] = useState("");
   const [testResult, setTestResult] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (isOpen) {
-      loadData();
-    }
-  }, [isOpen]);
-
-  const loadData = async () => {
+  const loadData = React.useCallback(async () => {
     const loadDataPromise = (async () => {
       // Load supported systems and current status in parallel
       const [systems, status] = await Promise.all([
@@ -109,8 +97,26 @@ const LightingConfigModal: React.FC<LightingConfigModalProps> = ({
 
       // If device has existing config, populate form
       if (status) {
+        // Normalize type from status string to enum expected by config
+        const normalizeType = (
+          t?: string
+        ): LightingSystemConfigDto.lightingSystemType => {
+          switch (t) {
+            case "nanoleaf":
+              return LightingSystemConfigDto.lightingSystemType.NANOLEAF;
+            case "wled":
+              return LightingSystemConfigDto.lightingSystemType.WLED;
+            case "ws2812":
+              return LightingSystemConfigDto.lightingSystemType.WS2812;
+            case "philips_hue":
+              return LightingSystemConfigDto.lightingSystemType.PHILIPS_HUE;
+            default:
+              return LightingSystemConfigDto.lightingSystemType.NANOLEAF;
+          }
+        };
+
         setConfig({
-          lightingSystemType: status.lightingSystemType as any,
+          lightingSystemType: normalizeType(status.lightingSystemType),
           lightingHostAddress: status.lightingHostAddress || "",
           lightingPort: status.lightingPort || 80,
           lightingAuthToken: "",
@@ -137,10 +143,36 @@ const LightingConfigModal: React.FC<LightingConfigModalProps> = ({
       setAlertMessage("Failed to load lighting system data");
       setShowAlert(true);
     }
-  };
+  }, [deviceId, withLoading]);
+
+  useEffect(() => {
+    if (isOpen) {
+      loadData();
+    }
+  }, [isOpen, loadData]);
 
   const handleSystemTypeChange = async (systemType: string) => {
-    setConfig((prev) => ({ ...prev, lightingSystemType: systemType as any }));
+    const normalizeType = (
+      t: string
+    ): LightingSystemConfigDto.lightingSystemType => {
+      switch (t) {
+        case "nanoleaf":
+          return LightingSystemConfigDto.lightingSystemType.NANOLEAF;
+        case "wled":
+          return LightingSystemConfigDto.lightingSystemType.WLED;
+        case "ws2812":
+          return LightingSystemConfigDto.lightingSystemType.WS2812;
+        case "philips_hue":
+          return LightingSystemConfigDto.lightingSystemType.PHILIPS_HUE;
+        default:
+          return LightingSystemConfigDto.lightingSystemType.NANOLEAF;
+      }
+    };
+
+    setConfig((prev) => ({
+      ...prev,
+      lightingSystemType: normalizeType(systemType),
+    }));
 
     // Load default configuration for selected system
     try {
@@ -485,7 +517,7 @@ const LightingConfigModal: React.FC<LightingConfigModalProps> = ({
                 <h3>System Type</h3>
                 <p>
                   {LightingSystemService.getLightingSystemDisplayName(
-                    currentStatus.lightingSystemType
+                    currentStatus.lightingSystemType || "unknown"
                   )}
                 </p>
               </IonLabel>

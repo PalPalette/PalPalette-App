@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { LightingSystemStatusDto } from "../../services/openapi/models/LightingSystemStatusDto";
 import { DevicesService } from "../../services/openapi/services/DevicesService";
+import type { LightingSystemStatus } from "../../services/LightingSystemService";
 
 export interface UseLightingStatusReturn {
-  status: LightingSystemStatusDto | null;
+  status: LightingSystemStatus | null;
   loading: boolean;
   error: string | null;
   isPolling: boolean;
@@ -15,7 +15,7 @@ export interface UseLightingStatusReturn {
 export const useLightingStatus = (
   deviceId?: string
 ): UseLightingStatusReturn => {
-  const [status, setStatus] = useState<LightingSystemStatusDto | null>(null);
+  const [status, setStatus] = useState<LightingSystemStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
@@ -33,9 +33,9 @@ export const useLightingStatus = (
         targetDeviceId
       );
       const newStatus =
-        await DevicesService.devicesControllerGetLightingSystemStatus(
+        (await DevicesService.devicesControllerGetLightingSystemStatus(
           targetDeviceId
-        );
+        )) as unknown as LightingSystemStatus;
       console.log("📡 useLightingStatus - API Response:", newStatus);
       setStatus(newStatus);
     } catch (err) {

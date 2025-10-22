@@ -28,7 +28,7 @@ import {
 } from "ionicons/icons";
 import { useLightingStatus } from "../../hooks/api/useLightingStatus";
 import { useLighting } from "../../hooks/api/useLighting";
-import { LightingSystemStatusDto } from "../../services/openapi/models/LightingSystemStatusDto";
+import { LightingStatus } from "../../services/LightingSystemService";
 
 interface LightingSetupStatusProps {
   deviceId: string;
@@ -81,7 +81,7 @@ export const LightingSetupStatus: React.FC<LightingSetupStatusProps> = ({
   };
 
   const isStatusStale = useCallback(
-    (currentStatus: LightingSystemStatusDto | null) => {
+    (currentStatus: { lightingLastTestAt?: string } | null) => {
       if (!currentStatus || !actionInitiatedAt) return false;
 
       // If we have a lastTestAt timestamp, check if it's before our action
@@ -200,17 +200,17 @@ export const LightingSetupStatus: React.FC<LightingSetupStatusProps> = ({
     }
 
     switch (status.lightingStatus) {
-      case LightingSystemStatusDto.lightingStatus.WORKING:
+      case LightingStatus.WORKING:
         return { text: "Working", color: "success", icon: checkmarkCircle };
-      case LightingSystemStatusDto.lightingStatus.ERROR:
+      case LightingStatus.ERROR:
         return { text: "Error", color: "danger", icon: alertCircle };
-      case LightingSystemStatusDto.lightingStatus.AUTHENTICATION_REQUIRED:
+      case LightingStatus.AUTHENTICATION_REQUIRED:
         return {
           text: "Authentication Required",
           color: "warning",
           icon: warning,
         };
-      case LightingSystemStatusDto.lightingStatus.UNKNOWN:
+      case LightingStatus.UNKNOWN:
       default:
         return { text: "Unknown", color: "medium", icon: alertCircle };
     }
@@ -220,7 +220,7 @@ export const LightingSetupStatus: React.FC<LightingSetupStatusProps> = ({
     if (!status) return 0.1;
     if (
       status.lightingSystemConfigured &&
-      status.lightingStatus === LightingSystemStatusDto.lightingStatus.WORKING
+      status.lightingStatus === LightingStatus.WORKING
     )
       return 1.0;
     if (status.lightingSystemConfigured) return 0.7;
@@ -242,10 +242,7 @@ export const LightingSetupStatus: React.FC<LightingSetupStatusProps> = ({
       };
     }
 
-    if (
-      status.lightingStatus ===
-      LightingSystemStatusDto.lightingStatus.AUTHENTICATION_REQUIRED
-    ) {
+    if (status.lightingStatus === LightingStatus.AUTHENTICATION_REQUIRED) {
       return {
         text: "Authentication Required",
         description:
@@ -255,9 +252,7 @@ export const LightingSetupStatus: React.FC<LightingSetupStatusProps> = ({
       };
     }
 
-    if (
-      status.lightingStatus === LightingSystemStatusDto.lightingStatus.ERROR
-    ) {
+    if (status.lightingStatus === LightingStatus.ERROR) {
       return {
         text: "Connection Error",
         description:
@@ -276,9 +271,7 @@ export const LightingSetupStatus: React.FC<LightingSetupStatusProps> = ({
       };
     }
 
-    if (
-      status.lightingStatus === LightingSystemStatusDto.lightingStatus.WORKING
-    ) {
+    if (status.lightingStatus === LightingStatus.WORKING) {
       return {
         text: "Setup Complete!",
         description: "Your lighting system is working correctly",

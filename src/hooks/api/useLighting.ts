@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { DevicesService } from "../../services/openapi/services/DevicesService";
 import { LightingSystemConfigDto } from "../../services/openapi/models/LightingSystemConfigDto";
-import { LightingSystemStatusDto } from "../../services/openapi/models/LightingSystemStatusDto";
+import type { LightingSystemStatus } from "../../services/LightingSystemService";
 import { UpdateLightingSystemDto } from "../../services/openapi/models/UpdateLightingSystemDto";
 
 export interface UseLightingReturn {
@@ -11,9 +11,7 @@ export interface UseLightingReturn {
     deviceId: string,
     config: LightingSystemConfigDto
   ) => Promise<boolean>;
-  getLightingStatus: (
-    deviceId: string
-  ) => Promise<LightingSystemStatusDto | null>;
+  getLightingStatus: (deviceId: string) => Promise<LightingSystemStatus | null>;
   sendColorPalette: (deviceId: string, colors: string[]) => Promise<boolean>;
   testLighting: (deviceId: string) => Promise<boolean>;
   updateLighting: (
@@ -53,14 +51,14 @@ export const useLighting = (): UseLightingReturn => {
   );
 
   const getLightingStatus = useCallback(
-    async (deviceId: string): Promise<LightingSystemStatusDto | null> => {
+    async (deviceId: string): Promise<LightingSystemStatus | null> => {
       setLoading(true);
       setError(null);
       try {
         const status =
-          await DevicesService.devicesControllerGetLightingSystemStatus(
+          (await DevicesService.devicesControllerGetLightingSystemStatus(
             deviceId
-          );
+          )) as unknown as LightingSystemStatus;
         return status;
       } catch (err) {
         const errorMessage =

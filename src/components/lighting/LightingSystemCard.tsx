@@ -10,18 +10,17 @@ import {
   IonItem,
   IonLabel,
   IonSpinner,
-  IonAlert,
   IonToast,
 } from "@ionic/react";
-import { bulb, settings, flash } from "ionicons/icons";
+import { bulb, settings } from "ionicons/icons";
 import {
   LightingSystemService,
   LightingSystemStatus,
+  LightingStatus,
 } from "../../services/LightingSystemService";
-import { LightingSystemStatusDto } from "../../services/openapi/models/LightingSystemStatusDto";
 import { useLoading, useToast, useWebSocket } from "../../hooks";
 import { useDeveloperMode } from "../../hooks/useDeveloperMode";
-import { LightingSystemStatusEvent } from "../../services/WebSocketService";
+// import { LightingSystemStatusEvent } from "../../services/WebSocketService";
 
 interface LightingSystemCardProps {
   deviceId: string;
@@ -30,14 +29,14 @@ interface LightingSystemCardProps {
 
 const LightingSystemCard: React.FC<LightingSystemCardProps> = memo(
   ({ deviceId, onConfigureClick }) => {
-    const { loading, withLoading } = useLoading();
+    const { loading } = useLoading();
     const { isDeveloperMode } = useDeveloperMode();
-    const { toastState, showSuccess, hideToast } = useToast();
+    const { toastState, hideToast } = useToast();
     const { lightingStatuses } = useWebSocket();
 
     const [status, setStatus] = useState<LightingSystemStatus | null>(null);
-    const [showAlert, setShowAlert] = useState(false);
-    const [alertMessage, setAlertMessage] = useState("");
+    // const [showAlert, setShowAlert] = useState(false);
+    // const [alertMessage, setAlertMessage] = useState("");
 
     const loadStatus = useCallback(async () => {
       try {
@@ -57,12 +56,11 @@ const LightingSystemCard: React.FC<LightingSystemCardProps> = memo(
         console.log("🔥 Updating lighting status from WebSocket:", wsStatus);
 
         // Map WebSocket status to our lighting status enum
-        let lightingStatus: LightingSystemStatusDto.lightingStatus =
-          LightingSystemStatusDto.lightingStatus.UNKNOWN;
+        let lightingStatus: LightingStatus = LightingStatus.UNKNOWN;
 
         // If device is ready and has a lighting system, it's working
         if (wsStatus.isReady && wsStatus.hasLightingSystem) {
-          lightingStatus = LightingSystemStatusDto.lightingStatus.WORKING;
+          lightingStatus = LightingStatus.WORKING;
         } else if (wsStatus.status) {
           const statusLower = wsStatus.status.toLowerCase();
           if (
@@ -71,26 +69,25 @@ const LightingSystemCard: React.FC<LightingSystemCardProps> = memo(
             statusLower.includes("working") ||
             statusLower.includes("success")
           ) {
-            lightingStatus = LightingSystemStatusDto.lightingStatus.WORKING;
+            lightingStatus = LightingStatus.WORKING;
           } else if (
             statusLower.includes("error") ||
             statusLower.includes("failed") ||
             statusLower.includes("timeout") ||
             statusLower.includes("invalid")
           ) {
-            lightingStatus = LightingSystemStatusDto.lightingStatus.ERROR;
+            lightingStatus = LightingStatus.ERROR;
           } else if (
             statusLower.includes("authentication") ||
             statusLower.includes("auth") ||
             statusLower.includes("unauthorized") ||
             statusLower.includes("token")
           ) {
-            lightingStatus =
-              LightingSystemStatusDto.lightingStatus.AUTHENTICATION_REQUIRED;
+            lightingStatus = LightingStatus.AUTHENTICATION_REQUIRED;
           }
         }
 
-        setStatus((prevStatus) => ({
+        setStatus((prevStatus: LightingSystemStatus | null) => ({
           ...prevStatus!,
           lightingStatus,
           lightingSystemType:
@@ -107,20 +104,20 @@ const LightingSystemCard: React.FC<LightingSystemCardProps> = memo(
       loadStatus();
     }, [loadStatus]);
 
-    const handleTest = async () => {
-      try {
-        await withLoading(LightingSystemService.testLightingSystem(deviceId));
-        showSuccess("Test request sent to device!");
-        // Refresh status after a delay
-        setTimeout(loadStatus, 3000);
-      } catch (error: unknown) {
-        console.error("Error testing lighting system:", error);
-        setAlertMessage("Failed to test lighting system");
-        setShowAlert(true);
-      }
-    };
+    // const handleTest = async () => {
+    //   try {
+    //     await withLoading(LightingSystemService.testLightingSystem(deviceId));
+    //     showSuccess("Test request sent to device!");
+    //     // Refresh status after a delay
+    //     setTimeout(loadStatus, 3000);
+    //   } catch (error: unknown) {
+    //     console.error("Error testing lighting system:", error);
+    //     setAlertMessage("Failed to test lighting system");
+    //     setShowAlert(true);
+    //   }
+    // };
 
-    const getSystemIcon = (systemType?: string) => {
+    const getSystemIcon = () => {
       // Only Nanoleaf is supported
       return bulb;
     };
@@ -144,7 +141,7 @@ const LightingSystemCard: React.FC<LightingSystemCardProps> = memo(
               <div
                 style={{ display: "flex", alignItems: "center", gap: "8px" }}
               >
-                <IonIcon icon={getSystemIcon(status?.lightingSystemType)} />
+                <IonIcon icon={getSystemIcon()} />
                 Lighting System
               </div>
             </IonCardTitle>
@@ -157,7 +154,7 @@ const LightingSystemCard: React.FC<LightingSystemCardProps> = memo(
                     <h3>System Type</h3>
                     <p>
                       {LightingSystemService.getLightingSystemDisplayName(
-                        status.lightingSystemType
+                        status.lightingSystemType || "unknown"
                       )}
                     </p>
                   </IonLabel>
@@ -231,13 +228,7 @@ const LightingSystemCard: React.FC<LightingSystemCardProps> = memo(
           </IonCardContent>
         </IonCard>
 
-        <IonAlert
-          isOpen={showAlert}
-          onDidDismiss={() => setShowAlert(false)}
-          header="Error"
-          message={alertMessage}
-          buttons={["OK"]}
-        />
+        {/* Test alert removed */}
 
         <IonToast
           isOpen={toastState.isOpen}

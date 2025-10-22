@@ -6,6 +6,8 @@ import React, {
   useCallback,
 } from "react";
 import { AuthenticationService } from "../services/openapi";
+import { PushNotificationsService } from "../services/openapi";
+import { PushService } from "../services/PushService";
 import { SecureStorageService } from "../services/secure-storage.service";
 
 export interface User {
@@ -182,6 +184,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           displayName: userData.displayName,
         });
         console.log("✅ Login successful");
+        // Register push token in the background (non-blocking)
+        try {
+          PushService.init();
+          // Do not await; let it run in the background
+          void PushService.syncRegistration();
+        } catch (e) {
+          console.warn("Push registration skipped:", e);
+        }
         return true;
       } else {
         console.error("❌ Incomplete user data received from server");
@@ -238,6 +248,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setRefreshToken(refresh_token);
         setUser(user);
         console.log("✅ Registration successful");
+        // After auto-login on registration, also register push token
+        try {
+          PushService.init();
+          void PushService.syncRegistration();
+        } catch (e) {
+          console.warn("Push registration (post-register) skipped:", e);
+        }
         return true;
       } else {
         console.error("❌ Registration response incomplete");
@@ -260,6 +277,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       // Try to call logout endpoint if we have a token
       const { accessToken } = await SecureStorageService.getTokens();
+      // Best-effort: attempt to unregister push token before clearing auth
+      try {
+        const pushToken = await SecureStorageService.getItem("push_token");
+        if (pushToken) {
+          // Fire-and-forget so we don't block UI
+          void PushNotificationsService.pushControllerUnregisterToken({
+            token: pushToken,
+          });
+        }
+      } catch (e) {
+        console.warn("Push token unregister skipped:", e);
+      }
       if (accessToken) {
         try {
           await AuthenticationService.authControllerLogout();
@@ -299,6 +328,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       window.removeEventListener("auth:sessionExpired", handleSessionExpired);
     };
   }, [loadStoredAuth]);
+
+  // When auth state becomes valid (e.g., app relaunch), ensure push is registered
+  useEffect(() => {
+    if (user && token) {
+      try {
+        PushService.init();
+        void PushService.syncRegistration();
+      } catch (e) {
+        console.warn("Push registration (auth effect) skipped:", e);
+      }
+    }
+  }, [user, token]);
 
   const value: AuthContextType = {
     user,

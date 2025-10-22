@@ -26,6 +26,9 @@ const config: CapacitorConfig = {
     App: {
       windowsPathPrefix: "ms-appx-web",
     },
+    PushNotifications: {
+      presentationOptions: ["badge", "sound", "alert"],
+    },
   },
   ios: {
     scheme: "PalPalette",

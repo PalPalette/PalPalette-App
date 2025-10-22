@@ -30,7 +30,10 @@ import {
   keypad,
 } from "ionicons/icons";
 import { DevicesService } from "../../services/openapi/services/DevicesService";
-import { LightingSystemStatusDto } from "../../services/openapi/models/LightingSystemStatusDto";
+import {
+  LightingStatus,
+  LightingSystemStatus,
+} from "../../services/LightingSystemService";
 
 // Simplified authentication state based on REST API data
 interface AuthenticationState {
@@ -70,7 +73,7 @@ const DeviceAuthNotification: React.FC<DeviceAuthNotificationProps> = ({
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [lightingStatus, setLightingStatus] =
-    useState<LightingSystemStatusDto | null>(null);
+    useState<LightingSystemStatus | null>(null);
   const [isPolling, setIsPolling] = useState(false);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const authStateRef = useRef<AuthenticationState | null>(null);
@@ -84,13 +87,13 @@ const DeviceAuthNotification: React.FC<DeviceAuthNotificationProps> = ({
   const pollLightingStatus = useCallback(async () => {
     try {
       const status =
-        await DevicesService.devicesControllerGetLightingSystemStatus(deviceId);
+        (await DevicesService.devicesControllerGetLightingSystemStatus(
+          deviceId
+        )) as unknown as LightingSystemStatus;
       setLightingStatus(status);
 
       // Handle different status states
-      if (
-        status.lightingStatus === LightingSystemStatusDto.lightingStatus.WORKING
-      ) {
+      if (status.lightingStatus === LightingStatus.WORKING) {
         // Authentication successful - only when status is explicitly 'working'
         const newState: AuthenticationState = {
           deviceId,
@@ -108,9 +111,7 @@ const DeviceAuthNotification: React.FC<DeviceAuthNotificationProps> = ({
         setTimeout(() => {
           onSuccess?.();
         }, 2000);
-      } else if (
-        status.lightingStatus === LightingSystemStatusDto.lightingStatus.ERROR
-      ) {
+      } else if (status.lightingStatus === LightingStatus.ERROR) {
         // Authentication failed
 
         const newState: AuthenticationState = {
@@ -129,8 +130,7 @@ const DeviceAuthNotification: React.FC<DeviceAuthNotificationProps> = ({
           onFailed?.();
         }, 3000);
       } else if (
-        status.lightingStatus ===
-        LightingSystemStatusDto.lightingStatus.AUTHENTICATION_REQUIRED
+        status.lightingStatus === LightingStatus.AUTHENTICATION_REQUIRED
       ) {
         // Authentication explicitly required - determine step from backend data
         const pairingCode = status.lightingStatusDetails?.pairingCode;
@@ -170,8 +170,7 @@ const DeviceAuthNotification: React.FC<DeviceAuthNotificationProps> = ({
         }
       } else if (
         status.requiresAuthentication &&
-        status.lightingStatus ===
-          LightingSystemStatusDto.lightingStatus.UNKNOWN &&
+        status.lightingStatus === LightingStatus.UNKNOWN &&
         status.lightingSystemConfigured
       ) {
         // System is configured but status is unknown and requires auth - wait for backend to determine next step

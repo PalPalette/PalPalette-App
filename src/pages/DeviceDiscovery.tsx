@@ -36,20 +36,20 @@ import {
   warningOutline,
 } from "ionicons/icons";
 import { DevicesService } from "../services/openapi/services/DevicesService";
-import type { Device } from "../services/openapi/models/Device";
+import type { DiscoverableDeviceDto } from "../services/openapi/models/DiscoverableDeviceDto";
 import { RefresherEventDetail } from "@ionic/core";
 import { useDevices } from "../hooks/useContexts";
 
 interface PairingAlert {
   isOpen: boolean;
-  device: Device | null;
+  device: DiscoverableDeviceDto | null;
   pairingCode: string;
 }
 
 export const DeviceDiscovery: React.FC = () => {
   const history = useHistory();
   const { refreshDevices } = useDevices();
-  const [devices, setDevices] = useState<Device[]>([]);
+  const [devices, setDevices] = useState<DiscoverableDeviceDto[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [isPairing, setIsPairing] = useState(false);
   const [discoveryMode, setDiscoveryMode] = useState<"local" | "global">(
@@ -104,7 +104,7 @@ export const DeviceDiscovery: React.FC = () => {
     }
   }, []);
 
-  const startPairing = (device: Device) => {
+  const startPairing = (device: DiscoverableDeviceDto) => {
     console.log("🔗 Starting pairing for device:", device.name);
 
     if (discoveryMode === "local") {
@@ -121,7 +121,7 @@ export const DeviceDiscovery: React.FC = () => {
     }
   };
 
-  const pairDeviceDirectly = async (device: Device) => {
+  const pairDeviceDirectly = async (device: DiscoverableDeviceDto) => {
     console.log(`🔗 Auto-pairing local device: ${device.name}`);
     setIsPairing(true);
 
@@ -202,8 +202,8 @@ export const DeviceDiscovery: React.FC = () => {
     return date.toLocaleDateString();
   };
 
-  const isPairingCodeExpired = (expires: string) => {
-    return new Date(expires) < new Date();
+  const isPairingCodeExpired = (expires?: string | null) => {
+    return !expires || new Date(expires) < new Date();
   };
 
   useEffect(() => {
@@ -324,7 +324,7 @@ export const DeviceDiscovery: React.FC = () => {
               <IonList>
                 {devices.map((device) => {
                   const expired = isPairingCodeExpired(
-                    device.pairingCodeExpiresAt
+                    device.pairingCodeExpires
                   );
 
                   return (
@@ -333,14 +333,14 @@ export const DeviceDiscovery: React.FC = () => {
                         icon={
                           expired
                             ? warningOutline
-                            : device.status === "active"
+                            : device.isActive
                             ? checkmarkCircle
                             : timeOutline
                         }
                         color={
                           expired
                             ? "warning"
-                            : device.status === "active"
+                            : device.isActive
                             ? "success"
                             : "medium"
                         }
@@ -349,7 +349,7 @@ export const DeviceDiscovery: React.FC = () => {
                       <IonLabel>
                         <h2>{device.name}</h2>
                         <p>
-                          <strong>IP:</strong> {device.ipAddress} •
+                          <strong>IP:</strong> {device.ipAddress || "n/a"} •
                           <strong>MAC:</strong> ...{device.macAddress}
                         </p>
                         <p>
@@ -357,7 +357,7 @@ export const DeviceDiscovery: React.FC = () => {
                         </p>
                         <p>
                           <strong>Last seen:</strong>{" "}
-                          {formatLastSeen(device.lastSeenAt)}
+                          {formatLastSeen(device.lastSeen)}
                         </p>
                         {expired && (
                           <IonNote color="warning">
