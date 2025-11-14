@@ -4,9 +4,6 @@ const config: CapacitorConfig = {
   appId: "com.palpalette.app",
   appName: "PalPalette",
   webDir: "dist",
-  server: {
-    androidScheme: "https",
-  },
   plugins: {
     Camera: {
       permissions: ["camera", "photos"],
