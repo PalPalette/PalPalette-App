@@ -20,7 +20,6 @@ const PaletteCreator = lazy(() => import("../../pages/PaletteCreator"));
 const Friends = lazy(() => import("../../pages/Friends"));
 const Messages = lazy(() => import("../../pages/Messages"));
 const Settings = lazy(() => import("../../pages/Settings"));
-const TokenRefreshTest = lazy(() => import("../../pages/TokenRefreshTest"));
 
 /**
  * Layout component for authenticated users
@@ -64,9 +63,6 @@ export const AuthenticatedLayout: React.FC = () => {
           </Route>
           <Route path="/settings">
             <Settings />
-          </Route>
-          <Route exact path="/token-test">
-            <TokenRefreshTest />
           </Route>
         </Suspense>
         <Route exact path="/">

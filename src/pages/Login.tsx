@@ -7,7 +7,6 @@ import {
   IonInputPasswordToggle,
   IonItem,
   IonList,
-  IonLoading,
   IonPage,
   IonSpinner,
   IonText,
@@ -23,7 +22,6 @@ import { useForm } from "react-hook-form";
 import * as Yup from "yup";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { colorPalette, person } from "ionicons/icons";
-import { Redirect } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 
 // Validation schemas
@@ -53,7 +51,7 @@ type LoginFormData = Yup.InferType<typeof loginValidationSchema>;
 type RegisterFormData = Yup.InferType<typeof registerValidationSchema>;
 
 const LoginPage: React.FC = () => {
-  const { user, loading, login, register } = useAuth();
+  const { status, login, register } = useAuth();
   const router = useIonRouter();
   const [presentToast] = useIonToast();
   const [isLogin, setIsLogin] = React.useState(true);
@@ -72,19 +70,18 @@ const LoginPage: React.FC = () => {
     resolver: yupResolver(registerValidationSchema),
   });
 
-  // Redirect if user is already authenticated
+  // Redirect if user is already authenticated (PublicRoute will handle this, but just in case)
   useEffect(() => {
-    if (user && router) {
+    if (status === "authenticated" && router) {
       router.push("/devices", "root", "replace");
     }
-  }, [user, router]);
+  }, [status, router]);
 
   // Login handler
   const onLoginSubmit = useCallback(
     async (data: LoginFormData) => {
       try {
         const success = await login(data.email, data.password);
-        console.log(success);
         if (success) {
           presentToast({
             message: "Welcome back! 🎨",
@@ -92,6 +89,7 @@ const LoginPage: React.FC = () => {
             color: "success",
             position: "top",
           });
+          // Navigation will happen automatically via PublicRoute redirect
         } else {
           presentToast({
             message: "Invalid email or password",
@@ -141,6 +139,7 @@ const LoginPage: React.FC = () => {
             color: "success",
             position: "top",
           });
+          // Navigation will happen automatically via PublicRoute redirect
         } else {
           presentToast({
             message: "Registration failed. Please try again.",
@@ -178,9 +177,27 @@ const LoginPage: React.FC = () => {
     registerForm.reset();
   };
 
-  // If user is authenticated, redirect
-  if (user) {
-    return <Redirect to="/devices" />;
+  // Show loading spinner during auth initialization
+  if (status === "initializing") {
+    return (
+      <IonPage>
+        <IonContent>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              height: "100vh",
+              flexDirection: "column",
+              gap: "1rem",
+            }}
+          >
+            <IonSpinner name="crescent" />
+            <span>Loading...</span>
+          </div>
+        </IonContent>
+      </IonPage>
+    );
   }
 
   const currentForm = isLogin ? loginForm : registerForm;
@@ -357,9 +374,9 @@ const LoginPage: React.FC = () => {
                     expand="block"
                     color="primary"
                     style={{ margin: "1.5rem 0" }}
-                    disabled={isSubmitting || loading}
+                    disabled={isSubmitting}
                   >
-                    {isSubmitting || loading ? (
+                    {isSubmitting ? (
                       <IonSpinner name="crescent" />
                     ) : (
                       <>
@@ -383,7 +400,7 @@ const LoginPage: React.FC = () => {
                       fill="clear"
                       color="primary"
                       onClick={toggleMode}
-                      disabled={isSubmitting || loading}
+                      disabled={isSubmitting}
                     >
                       {isLogin ? "Sign Up" : "Sign In"}
                     </IonButton>
@@ -413,8 +430,6 @@ const LoginPage: React.FC = () => {
           </div>
         </div>
       </IonContent>
-
-      <IonLoading isOpen={loading} message="Authenticating..." />
     </IonPage>
   );
 };
