@@ -1,7 +1,7 @@
-import { Route } from "react-router-dom";
+import { Route, Switch } from "react-router-dom";
 import { IonApp, IonRouterOutlet, setupIonicReact } from "@ionic/react";
 import { IonReactRouter } from "@ionic/react-router";
-import Login from "./pages/Login"; // Keep Login as direct import for faster auth
+import Login from "./pages/Login";
 import { AuthProvider } from "./contexts/AuthContext";
 import { DeviceProvider } from "./contexts/DeviceContext";
 import { DeveloperModeProvider } from "./contexts/DeveloperModeContext";
@@ -42,36 +42,40 @@ setupIonicReact();
 
 const AppContent: React.FC = () => {
   return (
-    <IonRouterOutlet>
-      {/* Public routes - login/register */}
-      <Route exact path="/login">
-        <PublicRoute>
-          <Login />
-        </PublicRoute>
-      </Route>
+    <IonRouterOutlet id="main">
+      <Switch>
+        {/* Public routes - login/register */}
+        <Route exact path="/login">
+          <PublicRoute>
+            <Login />
+          </PublicRoute>
+        </Route>
 
-      {/* All other routes are protected */}
-      <Route path="/">
-        <ProtectedRoute>
-          <AuthenticatedLayout />
-        </ProtectedRoute>
-      </Route>
+        {/* All other routes are protected */}
+        <Route path="/">
+          <ProtectedRoute>
+            <AuthenticatedLayout />
+          </ProtectedRoute>
+        </Route>
+      </Switch>
     </IonRouterOutlet>
   );
 };
 
-const App: React.FC = () => (
-  <IonApp>
-    <AuthProvider>
-      <DeviceProvider>
-        <DeveloperModeProvider>
-          <IonReactRouter>
-            <AppContent />
-          </IonReactRouter>
-        </DeveloperModeProvider>
-      </DeviceProvider>
-    </AuthProvider>
-  </IonApp>
-);
+const App: React.FC = () => {
+  return (
+    <IonApp>
+      <AuthProvider>
+        <DeviceProvider>
+          <DeveloperModeProvider>
+            <IonReactRouter>
+              <AppContent />
+            </IonReactRouter>
+          </DeveloperModeProvider>
+        </DeviceProvider>
+      </AuthProvider>
+    </IonApp>
+  );
+};
 
 export default App;

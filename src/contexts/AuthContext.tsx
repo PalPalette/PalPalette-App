@@ -4,11 +4,13 @@ import React, {
   useEffect,
   ReactNode,
   useCallback,
+  useRef,
 } from "react";
 import { AuthenticationService } from "../services/openapi";
 import { PushNotificationsService } from "../services/openapi";
 import { PushService } from "../services/PushService";
 import { SecureStorageService } from "../services/secure-storage.service";
+import { setAuthRefreshFunction } from "../services/http-interceptor.service";
 
 export interface User {
   id: string;
@@ -16,7 +18,11 @@ export interface User {
   displayName: string;
 }
 
+// Auth state machine: clear state transitions
+export type AuthStatus = "initializing" | "authenticated" | "unauthenticated";
+
 export interface AuthContextType {
+  status: AuthStatus;
   user: User | null;
   token: string | null;
   refreshToken: string | null;
@@ -34,7 +40,6 @@ export interface AuthContextType {
   refreshUser: () => Promise<void>;
   refreshTokens: () => Promise<boolean>;
   isAuthenticated: boolean;
-  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -44,17 +49,39 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const [status, setStatus] = useState<AuthStatus>("initializing");
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const isLoggingOut = useRef(false);
+
+  /**
+   * Helper to clear auth state (used by logout and token refresh failure)
+   */
+  const clearAuthState = useCallback(async () => {
+    if (isLoggingOut.current) {
+      return; // Prevent concurrent logout calls
+    }
+
+    isLoggingOut.current = true;
+
+    try {
+      await SecureStorageService.clearTokens();
+      setToken(null);
+      setRefreshToken(null);
+      setUser(null);
+      setStatus("unauthenticated");
+      console.log("✅ Auth state cleared");
+    } finally {
+      isLoggingOut.current = false;
+    }
+  }, []);
 
   /**
    * Load stored authentication data on app start
    */
   const loadStoredAuth = useCallback(async () => {
     try {
-      setLoading(true);
       const { accessToken, refreshToken } =
         await SecureStorageService.getTokens();
       const userData = await SecureStorageService.getUser();
@@ -73,18 +100,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           email: userData.email as string,
           displayName: userData.displayName as string,
         });
+        setStatus("authenticated");
         console.log("✅ Loaded stored authentication data");
       } else {
         console.warn("⚠️ Incomplete stored auth data, clearing");
         await SecureStorageService.clearTokens();
+        setStatus("unauthenticated");
       }
     } catch (error) {
       console.error("❌ Failed to load stored auth data:", error);
       setToken(null);
       setRefreshToken(null);
       setUser(null);
-    } finally {
-      setLoading(false);
+      setStatus("unauthenticated");
     }
   }, []);
 
@@ -107,7 +135,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   /**
-   * Refresh access tokens - now handled automatically by HTTP interceptor
+   * Refresh access tokens
    */
   const refreshTokens = useCallback(async (): Promise<boolean> => {
     try {
@@ -119,10 +147,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       const userAgent = navigator.userAgent || "PalPalette-App";
-      const response = await AuthenticationService.authControllerRefresh(
-        userAgent,
-        { refresh_token: currentRefreshToken }
-      );
+
+      // Create timeout promise (8 seconds)
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(
+          () => reject(new Error("Token refresh request timeout")),
+          8000
+        );
+      });
+
+      // Race between API call and timeout
+      const response = (await Promise.race([
+        AuthenticationService.authControllerRefresh(userAgent, {
+          refresh_token: currentRefreshToken,
+        }),
+        timeoutPromise,
+      ])) as Awaited<
+        ReturnType<typeof AuthenticationService.authControllerRefresh>
+      >;
 
       // Store new tokens
       await SecureStorageService.storeTokens(
@@ -133,16 +175,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       setToken(response.access_token);
       setRefreshToken(response.refresh_token);
+      setUser({
+        id: response.user.id!,
+        email: response.user.email!,
+        displayName: response.user.displayName!,
+      });
+      setStatus("authenticated");
 
       console.log("✅ Tokens refreshed successfully");
       return true;
     } catch (error) {
       console.error("❌ Token refresh failed:", error);
-      // Clear all auth data on refresh failure
-      await logout();
+      // Clear all auth data on refresh failure - redirect to login
+      await clearAuthState();
       return false;
     }
-  }, []);
+  }, [clearAuthState]);
 
   /**
    * Login with email and password
@@ -153,8 +201,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     deviceName?: string
   ): Promise<boolean> => {
     try {
-      setLoading(true);
-
       const userAgent = navigator.userAgent || "PalPalette-App";
       const loginData = {
         email,
@@ -183,11 +229,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           email: userData.email,
           displayName: userData.displayName,
         });
+        setStatus("authenticated");
         console.log("✅ Login successful");
+
         // Register push token in the background (non-blocking)
         try {
           PushService.init();
-          // Do not await; let it run in the background
           void PushService.syncRegistration();
         } catch (e) {
           console.warn("Push registration skipped:", e);
@@ -195,13 +242,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return true;
       } else {
         console.error("❌ Incomplete user data received from server");
+        setStatus("unauthenticated");
         return false;
       }
     } catch (error) {
-      console.error("❌ Login failed:", error);
+      console.error("❌ Login failed:", {
+        error,
+        message: error instanceof Error ? error.message : String(error),
+        name: error instanceof Error ? error.name : typeof error,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      setStatus("unauthenticated");
       return false;
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -214,7 +266,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     displayName: string
   ): Promise<boolean> => {
     try {
-      setLoading(true);
       const { AuthenticationService } = await import(
         "../services/openapi/services/AuthenticationService"
       );
@@ -247,7 +298,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setToken(access_token);
         setRefreshToken(refresh_token);
         setUser(user);
+        setStatus("authenticated");
         console.log("✅ Registration successful");
+
         // After auto-login on registration, also register push token
         try {
           PushService.init();
@@ -258,30 +311,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return true;
       } else {
         console.error("❌ Registration response incomplete");
+        setStatus("unauthenticated");
         return false;
       }
     } catch (error) {
       console.error("❌ Registration failed:", error);
+      setStatus("unauthenticated");
       return false;
-    } finally {
-      setLoading(false);
     }
   };
 
   /**
-   * Logout user
+   * Logout user - idempotent operation
    */
   const logout = async (): Promise<void> => {
     try {
-      setLoading(true);
-
       // Try to call logout endpoint if we have a token
       const { accessToken } = await SecureStorageService.getTokens();
+
       // Best-effort: attempt to unregister push token before clearing auth
       try {
         const pushToken = await SecureStorageService.getItem("push_token");
         if (pushToken) {
-          // Fire-and-forget so we don't block UI
           void PushNotificationsService.pushControllerUnregisterToken({
             token: pushToken,
           });
@@ -289,6 +340,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } catch (e) {
         console.warn("Push token unregister skipped:", e);
       }
+
       if (accessToken) {
         try {
           await AuthenticationService.authControllerLogout();
@@ -298,40 +350,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       // Always clear local data
-      await SecureStorageService.clearTokens();
-      setToken(null);
-      setRefreshToken(null);
-      setUser(null);
-      console.log("✅ Logout successful");
+      await clearAuthState();
     } catch (error) {
       console.error("❌ Logout failed:", error);
-    } finally {
-      setLoading(false);
+      // Even if logout fails, clear local state
+      await clearAuthState();
     }
   };
 
   // Load stored auth data on app start
   useEffect(() => {
     loadStoredAuth();
-
-    // Set up session expired event listener for HTTP interceptor
-    const handleSessionExpired = () => {
-      console.log("🚪 Session expired automatically - logging out user");
-      setToken(null);
-      setRefreshToken(null);
-      setUser(null);
-    };
-
-    window.addEventListener("auth:sessionExpired", handleSessionExpired);
-
-    return () => {
-      window.removeEventListener("auth:sessionExpired", handleSessionExpired);
-    };
   }, [loadStoredAuth]);
+
+  // Register the refresh function with HTTP interceptor
+  useEffect(() => {
+    setAuthRefreshFunction(refreshTokens);
+  }, [refreshTokens]);
 
   // When auth state becomes valid (e.g., app relaunch), ensure push is registered
   useEffect(() => {
-    if (user && token) {
+    if (user && token && status === "authenticated") {
       try {
         PushService.init();
         void PushService.syncRegistration();
@@ -339,9 +378,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.warn("Push registration (auth effect) skipped:", e);
       }
     }
-  }, [user, token]);
+  }, [user, token, status]);
 
   const value: AuthContextType = {
+    status,
     user,
     token,
     refreshToken,
@@ -350,8 +390,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     logout,
     refreshUser,
     refreshTokens,
-    isAuthenticated: !!user && !!token,
-    loading,
+    isAuthenticated: status === "authenticated",
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,11 +1,11 @@
 import React from "react";
 import { IonSpinner } from "@ionic/react";
+import { Redirect } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
-import Login from "../../pages/Login";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  fallback?: React.ReactNode;
+  redirectTo?: string;
   loadingComponent?: React.ReactNode;
 }
 
@@ -13,18 +13,18 @@ interface ProtectedRouteProps {
  * ProtectedRoute component that ensures user is authenticated before rendering children
  *
  * @param children - The components to render when authenticated
- * @param fallback - Optional custom component to show when not authenticated (defaults to Login)
+ * @param redirectTo - Where to redirect unauthenticated users (defaults to /login)
  * @param loadingComponent - Optional custom loading component
  */
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
-  fallback,
+  redirectTo = "/login",
   loadingComponent,
 }) => {
-  const { isAuthenticated, loading } = useAuth();
+  const { status } = useAuth();
 
-  // Show loading state while checking authentication
-  if (loading) {
+  // Show loading state while initializing authentication
+  if (status === "initializing") {
     return (
       loadingComponent || (
         <div
@@ -44,9 +44,10 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  // Show login or custom fallback if not authenticated
-  if (!isAuthenticated) {
-    return <>{fallback || <Login />}</>;
+  // Redirect to login if not authenticated
+  if (status === "unauthenticated") {
+    console.log("🚫 User not authenticated - redirecting to login");
+    return <Redirect to={redirectTo} />;
   }
 
   // User is authenticated, render the protected content

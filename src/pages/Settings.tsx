@@ -21,6 +21,7 @@ import {
   IonCardTitle,
   IonText,
   IonToggle,
+  useIonRouter,
 } from "@ionic/react";
 import {
   person,
@@ -37,6 +38,7 @@ import { TokenStatus } from "../components/common/TokenStatus";
 const Settings: React.FC = () => {
   const { user, logout } = useAuth();
   const { isDeveloperMode, toggleDeveloperMode } = useDeveloperMode();
+  const router = useIonRouter();
 
   // Message timeframe state (must be inside component)
   const [timeframeEnabled, setTimeframeEnabled] = useState(false);
@@ -79,8 +81,20 @@ const Settings: React.FC = () => {
     }
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    try {
+      await logout();
+      // Use router navigation after logout completes
+      setTimeout(() => {
+        router.push("/login", "root", "replace");
+      }, 100);
+    } catch (error) {
+      console.error("Logout error:", error);
+      // Still navigate to login even if logout fails
+      setTimeout(() => {
+        router.push("/login", "root", "replace");
+      }, 100);
+    }
   };
 
   return (

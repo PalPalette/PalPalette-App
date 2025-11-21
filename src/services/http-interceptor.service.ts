@@ -14,9 +14,17 @@ export interface TokenRefreshResponse {
   };
 }
 
+// Global reference to AuthContext refresh function
+let globalRefreshTokensFn: (() => Promise<boolean>) | null = null;
+
+export function setAuthRefreshFunction(refreshFn: () => Promise<boolean>) {
+  globalRefreshTokensFn = refreshFn;
+}
+
 /**
  * HTTP Interceptor Service for automatic token refresh
  * This service intercepts all API calls and handles token refresh automatically
+ * Now simplified to delegate to AuthContext
  */
 export class HttpInterceptorService {
   private static instance: HttpInterceptorService;
@@ -79,7 +87,18 @@ export class HttpInterceptorService {
 
         return response;
       } catch (error) {
-        console.error("Network error in interceptor:", error);
+        console.error("Network error in interceptor:", {
+          error,
+          message: error instanceof Error ? error.message : String(error),
+          name: error instanceof Error ? error.name : typeof error,
+          stack: error instanceof Error ? error.stack : undefined,
+          url:
+            typeof input === "string"
+              ? input
+              : input instanceof URL
+              ? input.href
+              : "Request object",
+        });
         throw error;
       }
     };
@@ -105,14 +124,11 @@ export class HttpInterceptorService {
   }
 
   /**
-   * Handle 401 unauthorized responses
+   * Handle 401 unauthorized responses by calling AuthContext refresh
    */
   private async handleUnauthorized(): Promise<string | null> {
-    const { refreshToken } = await SecureStorageService.getTokens();
-
-    if (!refreshToken) {
-      console.log("❌ No refresh token available");
-      this.notifySessionExpired();
+    if (!globalRefreshTokensFn) {
+      console.error("❌ Auth refresh function not registered");
       return null;
     }
 
@@ -126,63 +142,42 @@ export class HttpInterceptorService {
     this.isRefreshing = true;
 
     try {
-      console.log("🔄 Refreshing tokens...");
+      console.log("🔄 Calling AuthContext refreshTokens...");
 
-      // Call refresh endpoint directly using the original fetch
-      const response = await this.originalFetch("/auth/refresh", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ refresh_token: refreshToken }),
+      // Add timeout to refresh attempt (10 seconds)
+      const timeoutPromise = new Promise<boolean>((_, reject) => {
+        setTimeout(
+          () => reject(new Error("Token refresh timeout after 10 seconds")),
+          10000
+        );
       });
 
-      if (!response.ok) {
-        throw new Error(`Token refresh failed: ${response.status}`);
+      // Race between refresh and timeout
+      const success = await Promise.race([
+        globalRefreshTokensFn(),
+        timeoutPromise,
+      ]);
+
+      if (success) {
+        // Get the new token
+        const { accessToken } = await SecureStorageService.getTokens();
+
+        if (accessToken) {
+          // Process queued requests
+          this.processQueue(null, accessToken);
+          console.log("✅ Token refresh successful");
+          return accessToken;
+        }
       }
 
-      const tokenData: TokenRefreshResponse = await response.json();
-
-      // Store new tokens
-      await SecureStorageService.storeTokens(
-        tokenData.access_token,
-        tokenData.refresh_token
-      );
-      await SecureStorageService.storeUser(tokenData.user);
-
-      // Process queued requests
-      this.processQueue(null, tokenData.access_token);
-
-      console.log("✅ Token refresh successful");
-      return tokenData.access_token;
+      throw new Error("Token refresh failed");
     } catch (error) {
       console.error("❌ Token refresh failed:", error);
-
-      // Clear tokens and notify session expired
-      await SecureStorageService.clearTokens();
       this.processQueue(error as Error, null);
-      this.notifySessionExpired();
-
       return null;
     } finally {
       this.isRefreshing = false;
     }
-  }
-
-  /**
-   * Original fetch method (without interception)
-   */
-  private async originalFetch(
-    url: string,
-    init?: RequestInit
-  ): Promise<Response> {
-    const baseUrl = OpenAPI.BASE || "http://localhost:3000";
-    const fullUrl = url.startsWith("http") ? url : `${baseUrl}${url}`;
-
-    return fetch(fullUrl, {
-      ...init,
-      credentials: "include",
-    });
   }
 
   /**
@@ -200,20 +195,6 @@ export class HttpInterceptorService {
     });
 
     this.failedQueue = [];
-  }
-
-  /**
-   * Notify the app that the session has expired
-   */
-  private notifySessionExpired() {
-    console.log("🚪 Session expired - dispatching event");
-
-    // Dispatch custom event
-    window.dispatchEvent(
-      new CustomEvent("auth:sessionExpired", {
-        detail: { reason: "Token refresh failed" },
-      })
-    );
   }
 
   /**

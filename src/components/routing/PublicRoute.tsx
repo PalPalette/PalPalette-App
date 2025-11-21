@@ -1,4 +1,5 @@
 import React from "react";
+import { IonSpinner } from "@ionic/react";
 import { useAuth } from "../../hooks/useAuth";
 import { Redirect } from "react-router-dom";
 
@@ -18,15 +19,30 @@ export const PublicRoute: React.FC<PublicRouteProps> = ({
   children,
   redirectTo = "/devices",
 }) => {
-  const { isAuthenticated, loading } = useAuth();
+  const { status } = useAuth();
 
-  // Don't redirect while still loading auth state
-  if (loading) {
-    return <>{children}</>;
+  // Show loading spinner while auth state is being determined
+  if (status === "initializing") {
+    return (
+      <div
+        key="public-route-loading"
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
+          flexDirection: "column",
+          gap: "1rem",
+        }}
+      >
+        <IonSpinner name="crescent" />
+        <span>Loading...</span>
+      </div>
+    );
   }
 
   // If user is already authenticated, redirect to main app
-  if (isAuthenticated) {
+  if (status === "authenticated") {
     return <Redirect to={redirectTo} />;
   }
 
