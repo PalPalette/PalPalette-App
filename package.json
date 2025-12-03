@@ -13,7 +13,7 @@
     "test.e2e": "cypress run",
     "test.unit": "vitest",
     "lint": "eslint",
-    "api:generate": "openapi -i http://localhost:3000/api-json -o src/services/openapi",
+    "api:generate": "openapi -i https://cides06.gm.fh-koeln.de/api-json -o src/services/openapi",
     "api:clean": "rimraf src/services/openapi",
     "api:update": "npm run api:clean && npm run api:generate",
     "ionic:build": "npm run build",

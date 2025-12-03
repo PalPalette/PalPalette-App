@@ -4,19 +4,19 @@
 /* eslint-disable */
 export type UpdateLightingSystemDto = {
     /**
-     * Type of lighting system
+     * Type of lighting system (nanoleaf, wled, ws2812, or philips_hue)
      */
     lightingSystemType?: UpdateLightingSystemDto.lightingSystemType;
     /**
-     * Updated IP address or hostname
+     * IP address or hostname of the lighting system (for networked systems like Nanoleaf/WLED)
      */
     lightingHostAddress?: string;
     /**
-     * Updated port number
+     * Port number for the lighting system (e.g., 16021 for Nanoleaf)
      */
     lightingPort?: number;
     /**
-     * Updated authentication token
+     * Authentication token obtained from the lighting system (e.g., Nanoleaf auth token after button press)
      */
     lightingAuthToken?: string;
     /**
@@ -34,7 +34,7 @@ export type UpdateLightingSystemDto = {
 };
 export namespace UpdateLightingSystemDto {
     /**
-     * Type of lighting system
+     * Type of lighting system (nanoleaf, wled, ws2812, or philips_hue)
      */
     export enum lightingSystemType {
         NANOLEAF = 'nanoleaf',

@@ -18,9 +18,8 @@ import {
   LightingSystemStatus,
   LightingStatus,
 } from "../../services/LightingSystemService";
-import { useLoading, useToast, useWebSocket } from "../../hooks";
+import { useLoading, useToast } from "../../hooks";
 import { useDeveloperMode } from "../../hooks/useDeveloperMode";
-// import { LightingSystemStatusEvent } from "../../services/WebSocketService";
 
 interface LightingSystemCardProps {
   deviceId: string;
@@ -32,7 +31,6 @@ const LightingSystemCard: React.FC<LightingSystemCardProps> = memo(
     const { loading } = useLoading();
     const { isDeveloperMode } = useDeveloperMode();
     const { toastState, hideToast } = useToast();
-    const { lightingStatuses } = useWebSocket();
 
     const [status, setStatus] = useState<LightingSystemStatus | null>(null);
     // const [showAlert, setShowAlert] = useState(false);
@@ -49,59 +47,13 @@ const LightingSystemCard: React.FC<LightingSystemCardProps> = memo(
       }
     }, [deviceId]);
 
-    // Update status from WebSocket real-time updates
-    useEffect(() => {
-      const wsStatus = lightingStatuses.get(deviceId);
-      if (wsStatus) {
-        console.log("🔥 Updating lighting status from WebSocket:", wsStatus);
-
-        // Map WebSocket status to our lighting status enum
-        let lightingStatus: LightingStatus = LightingStatus.UNKNOWN;
-
-        // If device is ready and has a lighting system, it's working
-        if (wsStatus.isReady && wsStatus.hasLightingSystem) {
-          lightingStatus = LightingStatus.WORKING;
-        } else if (wsStatus.status) {
-          const statusLower = wsStatus.status.toLowerCase();
-          if (
-            statusLower.includes("connected") ||
-            statusLower.includes("ready") ||
-            statusLower.includes("working") ||
-            statusLower.includes("success")
-          ) {
-            lightingStatus = LightingStatus.WORKING;
-          } else if (
-            statusLower.includes("error") ||
-            statusLower.includes("failed") ||
-            statusLower.includes("timeout") ||
-            statusLower.includes("invalid")
-          ) {
-            lightingStatus = LightingStatus.ERROR;
-          } else if (
-            statusLower.includes("authentication") ||
-            statusLower.includes("auth") ||
-            statusLower.includes("unauthorized") ||
-            statusLower.includes("token")
-          ) {
-            lightingStatus = LightingStatus.AUTHENTICATION_REQUIRED;
-          }
-        }
-
-        setStatus((prevStatus: LightingSystemStatus | null) => ({
-          ...prevStatus!,
-          lightingStatus,
-          lightingSystemType:
-            wsStatus.systemType || prevStatus?.lightingSystemType || "unknown",
-          isReady: wsStatus.isReady || false,
-          hasLightingSystem: wsStatus.hasLightingSystem || false,
-          lightingSystemConfigured: wsStatus.hasLightingSystem || false,
-          lastUpdated: new Date().toISOString(),
-        }));
-      }
-    }, [lightingStatuses, deviceId]);
-
     useEffect(() => {
       loadStatus();
+
+      // Poll for status updates every 30 seconds
+      const intervalId = setInterval(loadStatus, 30000);
+
+      return () => clearInterval(intervalId);
     }, [loadStatus]);
 
     // const handleTest = async () => {

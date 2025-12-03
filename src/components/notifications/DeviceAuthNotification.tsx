@@ -144,7 +144,8 @@ const DeviceAuthNotification: React.FC<DeviceAuthNotificationProps> = ({
           message = "Enter the pairing code in your lighting app";
         } else if (authStep === "press_power_button" || !authStep) {
           currentStep = "press_power_button";
-          message = "Press the power button on your device to start pairing";
+          message =
+            "Press the power button on your device for 5 seconds to start pairing";
         } else {
           currentStep = "waiting";
           message = "Authentication required - follow device instructions";

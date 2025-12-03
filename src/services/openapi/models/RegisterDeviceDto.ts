@@ -20,24 +20,35 @@ export type RegisterDeviceDto = {
      */
     firmwareVersion?: string;
     /**
-     * Type of lighting system to connect to
+     * Type of lighting system (optional during registration, can be configured later)
      */
-    lightingSystemType?: string;
+    lightingSystemType?: RegisterDeviceDto.lightingSystemType;
     /**
-     * Host address of the lighting system
+     * IP address or hostname of the lighting system (optional during registration)
      */
     lightingHostAddress?: string;
     /**
-     * Port for lighting system connection
+     * Port for lighting system connection (optional during registration)
      */
     lightingPort?: number;
     /**
-     * Authentication token for lighting system
+     * Authentication token for lighting system (optional during registration)
      */
     lightingAuthToken?: string;
     /**
-     * Custom configuration object for specific lighting systems
+     * Custom configuration object for specific lighting systems (optional during registration)
      */
     lightingCustomConfig?: Record<string, any>;
 };
+export namespace RegisterDeviceDto {
+    /**
+     * Type of lighting system (optional during registration, can be configured later)
+     */
+    export enum lightingSystemType {
+        NANOLEAF = 'nanoleaf',
+        WLED = 'wled',
+        WS2812 = 'ws2812',
+        PHILIPS_HUE = 'philips_hue',
+    }
+}
 

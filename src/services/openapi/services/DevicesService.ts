@@ -10,6 +10,7 @@ import type { LightingSystemConfigDto } from '../models/LightingSystemConfigDto'
 import type { NotificationResponseDto } from '../models/NotificationResponseDto';
 import type { PairingCodeResponseDto } from '../models/PairingCodeResponseDto';
 import type { RegisterDeviceDto } from '../models/RegisterDeviceDto';
+import type { RegisterDeviceResponseDto } from '../models/RegisterDeviceResponseDto';
 import type { ResetDeviceResponseDto } from '../models/ResetDeviceResponseDto';
 import type { SupportedLightingSystemsResponseDto } from '../models/SupportedLightingSystemsResponseDto';
 import type { UpdateDeviceDto } from '../models/UpdateDeviceDto';
@@ -21,14 +22,15 @@ import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
 export class DevicesService {
     /**
-     * Register a new device (self-setup)
+     * Register or reconnect a device
+     * Devices call this on boot to register or get their current state. Returns claim status, owner info (if claimed), and lighting configuration.
      * @param requestBody
-     * @returns any Device registered successfully
+     * @returns RegisterDeviceResponseDto Device registered/reconnected successfully. Returns different data based on claim status.
      * @throws ApiError
      */
     public static devicesControllerRegisterDevice(
         requestBody: RegisterDeviceDto,
-    ): CancelablePromise<any> {
+    ): CancelablePromise<RegisterDeviceResponseDto> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/devices/register',
@@ -36,7 +38,6 @@ export class DevicesService {
             mediaType: 'application/json',
             errors: {
                 400: `Bad request - validation error`,
-                409: `Device already exists`,
             },
         });
     }
@@ -93,6 +94,79 @@ export class DevicesService {
         return __request(OpenAPI, {
             method: 'DELETE',
             url: '/devices/{id}/reset',
+            path: {
+                'id': id,
+            },
+            errors: {
+                401: `Unauthorized`,
+                403: `Forbidden - not device owner`,
+                404: `Device not found`,
+            },
+        });
+    }
+    /**
+     * Update lighting system configuration (device self-reporting)
+     * Devices call this endpoint after successfully connecting to their lighting system (e.g., Nanoleaf, WLED) to store/update the configuration in the backend. This ensures the configuration persists even if the device loses power.
+     * @param id Device ID (UUID)
+     * @param requestBody
+     * @returns any Lighting configuration updated successfully. Returns updated device.
+     * @throws ApiError
+     */
+    public static devicesControllerUpdateDeviceLighting(
+        id: string,
+        requestBody: UpdateLightingSystemDto,
+    ): CancelablePromise<any> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/devices/{id}/lighting',
+            path: {
+                'id': id,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Bad request - validation error`,
+                404: `Device not found`,
+            },
+        });
+    }
+    /**
+     * Update lighting system configuration
+     * @param id Device ID
+     * @param requestBody
+     * @returns any Lighting system updated successfully
+     * @throws ApiError
+     */
+    public static devicesControllerUpdateLightingSystem(
+        id: string,
+        requestBody: UpdateLightingSystemDto,
+    ): CancelablePromise<any> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/devices/{id}/lighting',
+            path: {
+                'id': id,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Bad request - validation error`,
+                404: `Device not found`,
+            },
+        });
+    }
+    /**
+     * Reset/clear lighting system configuration
+     * @param id Device ID
+     * @returns any Lighting system configuration cleared successfully
+     * @throws ApiError
+     */
+    public static devicesControllerResetLightingSystem(
+        id: string,
+    ): CancelablePromise<any> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/devices/{id}/lighting',
             path: {
                 'id': id,
             },
@@ -212,53 +286,6 @@ export class DevicesService {
             mediaType: 'application/json',
             errors: {
                 400: `Bad request - validation error`,
-                401: `Unauthorized`,
-                403: `Forbidden - not device owner`,
-                404: `Device not found`,
-            },
-        });
-    }
-    /**
-     * Update lighting system configuration
-     * @param id Device ID
-     * @param requestBody
-     * @returns any Lighting system updated successfully
-     * @throws ApiError
-     */
-    public static devicesControllerUpdateLightingSystem(
-        id: string,
-        requestBody: UpdateLightingSystemDto,
-    ): CancelablePromise<any> {
-        return __request(OpenAPI, {
-            method: 'PATCH',
-            url: '/devices/{id}/lighting',
-            path: {
-                'id': id,
-            },
-            body: requestBody,
-            mediaType: 'application/json',
-            errors: {
-                400: `Bad request - validation error`,
-                404: `Device not found`,
-            },
-        });
-    }
-    /**
-     * Reset/clear lighting system configuration
-     * @param id Device ID
-     * @returns any Lighting system configuration cleared successfully
-     * @throws ApiError
-     */
-    public static devicesControllerResetLightingSystem(
-        id: string,
-    ): CancelablePromise<any> {
-        return __request(OpenAPI, {
-            method: 'DELETE',
-            url: '/devices/{id}/lighting',
-            path: {
-                'id': id,
-            },
-            errors: {
                 401: `Unauthorized`,
                 403: `Forbidden - not device owner`,
                 404: `Device not found`,

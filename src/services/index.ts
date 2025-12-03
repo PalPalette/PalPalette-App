@@ -1,14 +1,17 @@
 // Core services (keep these as they're not API-related)
 export { CameraService } from "./CameraService";
 export { ColorExtractionService } from "./ColorExtractionService";
-export { WebSocketService } from "./WebSocketService";
 export { LightingSystemService } from "./LightingSystemService";
 
-// Notification service
+// Logger service
 export {
-  UserNotificationService,
-  userNotificationService,
-} from "./UserNotificationService";
+  logger,
+  authLogger,
+  deviceLogger,
+  apiLogger,
+  lightingLogger,
+  LogLevel,
+} from "./LoggerService";
 
 // API configuration - simple OpenAPI setup
 export { setupServices } from "./setupServices";
@@ -27,11 +30,6 @@ export * from "./openapi";
 // Type exports
 export type { CameraPhoto } from "./CameraService";
 export type { ExtractedColor, ColorPalette } from "./ColorExtractionService";
-export type {
-  UserNotification,
-  NotificationAction,
-  DeviceAuthenticationState,
-} from "./UserNotificationService";
 
 // Re-export common generated types for convenience
 export type {

@@ -7,8 +7,6 @@ const getEnvironmentConfig = () => {
     // Vite environment - use import.meta.env
     return {
       BASE_URL: import.meta.env.VITE_BACKEND_URL || "http://localhost:3000",
-      WEBSOCKET_URL:
-        import.meta.env.VITE_WEBSOCKET_URL || "http://localhost:3001",
       ENVIRONMENT: import.meta.env.VITE_ENVIRONMENT || "development",
       DEBUG_MODE: import.meta.env.VITE_DEBUG_MODE === "true",
       LOG_LEVEL: import.meta.env.VITE_LOG_LEVEL || "debug",
@@ -18,7 +16,6 @@ const getEnvironmentConfig = () => {
     // This ensures Android can reach your development backend
     return {
       BASE_URL: "http://192.168.178.66:3000",
-      WEBSOCKET_URL: "http://192.168.178.66:3001",
       ENVIRONMENT: "mobile-dev",
       DEBUG_MODE: true,
       LOG_LEVEL: "debug",
@@ -32,7 +29,6 @@ const ENV_CONFIG = getEnvironmentConfig();
 if (ENV_CONFIG.DEBUG_MODE) {
   console.log("🔧 PalPalette API Configuration:", {
     BASE_URL: ENV_CONFIG.BASE_URL,
-    WEBSOCKET_URL: ENV_CONFIG.WEBSOCKET_URL,
     ENVIRONMENT: ENV_CONFIG.ENVIRONMENT,
     DEBUG_MODE: ENV_CONFIG.DEBUG_MODE,
   });
@@ -40,7 +36,6 @@ if (ENV_CONFIG.DEBUG_MODE) {
 
 export const API_CONFIG = {
   BASE_URL: ENV_CONFIG.BASE_URL,
-  WEBSOCKET_URL: ENV_CONFIG.WEBSOCKET_URL,
   ENDPOINTS: {
     AUTH: {
       LOGIN: "/auth/login",

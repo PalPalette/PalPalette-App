@@ -462,7 +462,9 @@ const LightingConfigModal: React.FC<LightingConfigModalProps> = ({
                 </p>
                 <ul style={{ margin: "8px 0", paddingLeft: "16px" }}>
                   <li>Discover your Nanoleaf devices using mDNS</li>
-                  <li>Prompt you to press and hold the power button</li>
+                  <li>
+                    Prompt you to press and hold the power button for 5 seconds
+                  </li>
                   <li>Automatically generate and store the auth token</li>
                 </ul>
                 <p>No manual configuration required!</p>
