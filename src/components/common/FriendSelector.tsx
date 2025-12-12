@@ -79,7 +79,9 @@ export const FriendSelector: React.FC<FriendSelectorProps> = ({
             const { UsersService } = await import(
               "../../services/openapi/services/UsersService"
             );
-            const userInfo = await UsersService.usersControllerGetUser(user.id);
+            // Fetch user info (devices expected to be included if available)
+            const userInfo: FriendDto | null =
+              await UsersService.usersControllerGetUser(user.id);
             if (userInfo && Array.isArray(userInfo.devices)) {
               setUserDevices(userInfo.devices);
             } else {
@@ -107,10 +109,18 @@ export const FriendSelector: React.FC<FriendSelectorProps> = ({
   const handleSend = () => {
     setSendError(null);
     const recipients: Recipient[] = [];
+    const skipped: string[] = [];
 
     // Add self if selected
-    if (sendToSelf && user && userDevices.length > 0) {
-      recipients.push({ friendId: user.id, deviceId: userDevices[0].id });
+    if (sendToSelf && user) {
+      if (userDevices.length > 0) {
+        recipients.push({ friendId: user.id, deviceId: userDevices[0].id });
+      } else {
+        // TODO: Remove this temporary workaround - for testing purposes only
+        // Allow sending to self even without a device by using empty deviceId
+        // In production, this should skip/warn when no device is available
+        recipients.push({ friendId: user.id, deviceId: "" });
+      }
     }
 
     // Add selected friends
@@ -118,15 +128,28 @@ export const FriendSelector: React.FC<FriendSelectorProps> = ({
       const friend = friends.find((f) => f.id === friendId);
       if (friend && friend.devices && friend.devices.length > 0) {
         recipients.push({ friendId, deviceId: friend.devices[0].id });
-      } else {
-        console.log("No devices available for friend:", friendId);
+      } else if (friend) {
+        skipped.push(`${friend.displayName}`);
       }
     });
 
     if (recipients.length > 0) {
       onSendToFriends(recipients);
+      if (skipped.length > 0) {
+        setSendError(
+          `Skipped ${skipped.length} recipient${
+            skipped.length !== 1 ? "s" : ""
+          } without devices: ${skipped.join(", ")}.`
+        );
+      }
     } else {
-      setSendError("Please select at least one recipient with a device.");
+      setSendError(
+        skipped.length > 0
+          ? `No valid recipients. The following have no devices: ${skipped.join(
+              ", "
+            )}.`
+          : "Please select at least one recipient."
+      );
     }
   };
 
@@ -142,6 +165,9 @@ export const FriendSelector: React.FC<FriendSelectorProps> = ({
       friend.displayName.toLowerCase().includes(searchText.toLowerCase()) ||
       friend.email.toLowerCase().includes(searchText.toLowerCase())
   );
+
+  const friendHasDevice = (f: FriendDto) =>
+    Array.isArray(f.devices) && f.devices.length > 0;
 
   return (
     <IonModal isOpen={isOpen} onDidDismiss={handleClose}>
@@ -323,7 +349,11 @@ export const FriendSelector: React.FC<FriendSelectorProps> = ({
                   <IonItem
                     key={friend.id}
                     button
-                    onClick={() => toggleFriendSelection(friend.id)}
+                    disabled={!friendHasDevice(friend)}
+                    onClick={() =>
+                      friendHasDevice(friend) &&
+                      toggleFriendSelection(friend.id)
+                    }
                   >
                     <IonAvatar slot="start">
                       <div
@@ -346,13 +376,29 @@ export const FriendSelector: React.FC<FriendSelectorProps> = ({
 
                     <IonLabel>
                       <h2>{friend.displayName}</h2>
-                      <p>{friend.email}</p>
+                      <p>
+                        {friend.email}
+                        {!friendHasDevice(friend) && (
+                          <span
+                            style={{
+                              marginLeft: 8,
+                              color: "var(--ion-color-danger)",
+                            }}
+                          >
+                            • No device
+                          </span>
+                        )}
+                      </p>
                     </IonLabel>
 
                     <IonCheckbox
                       slot="end"
+                      disabled={!friendHasDevice(friend)}
                       checked={selectedFriends.includes(friend.id)}
-                      onIonChange={() => toggleFriendSelection(friend.id)}
+                      onIonChange={() =>
+                        friendHasDevice(friend) &&
+                        toggleFriendSelection(friend.id)
+                      }
                     />
                   </IonItem>
                 ))}

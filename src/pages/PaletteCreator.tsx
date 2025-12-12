@@ -12,9 +12,10 @@ import {
   IonCard,
   IonCardContent,
   IonText,
-  IonGrid,
-  IonRow,
-  IonCol,
+  IonList,
+  IonItem,
+  IonReorder,
+  IonReorderGroup,
   IonChip,
   IonLabel,
   IonSegment,
@@ -23,7 +24,7 @@ import {
 import { send, camera, shuffle, brush } from "ionicons/icons";
 import { PhotoPicker } from "../components/common";
 import { ColorPicker } from "../components/common/ColorPicker";
-import { FriendSelector } from "../components/common";
+import { FriendSelectorEnhanced } from "../components/common/FriendSelectorEnhanced";
 import {
   ColorPalette,
   ExtractedColor,
@@ -38,8 +39,7 @@ const PaletteCreator: React.FC = () => {
   const [currentPalette, setCurrentPalette] = useState<ColorPalette | null>(
     null
   );
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  // Reorder state handled by IonReorderGroup; legacy indices removed
   const [showFriendSelector, setShowFriendSelector] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showToast, setShowToast] = useState(false);
@@ -112,42 +112,18 @@ const PaletteCreator: React.FC = () => {
     }
   };
 
-  const handleDragStart = (e: React.DragEvent, index: number) => {
-    setDraggedIndex(index);
-    e.dataTransfer.effectAllowed = "move";
-  };
-
-  const handleDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
-    setDragOverIndex(index);
-  };
-
-  const handleDragLeave = () => {
-    setDragOverIndex(null);
-  };
-
-  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
-    e.preventDefault();
-
-    if (
-      !currentPalette ||
-      draggedIndex === null ||
-      draggedIndex === dropIndex
-    ) {
-      setDraggedIndex(null);
-      setDragOverIndex(null);
-      return;
-    }
-
-    const reorderedColors = [...currentPalette.colors];
-    const draggedColor = reorderedColors[draggedIndex];
-
-    reorderedColors.splice(draggedIndex, 1);
-    reorderedColors.splice(dropIndex, 0, draggedColor);
-
-    handleColorsReordered(reorderedColors);
-    setDraggedIndex(null);
-    setDragOverIndex(null);
+  // IonReorderGroup handler for cross-platform drag & drop
+  const handleItemReorder = (event: CustomEvent) => {
+    if (!currentPalette) return;
+    type ReorderDetail = { from: number; to: number; complete: () => void };
+    const { from, to, complete } = (
+      event as unknown as { detail: ReorderDetail }
+    ).detail;
+    const arr = [...currentPalette.colors];
+    const [moved] = arr.splice(from, 1);
+    arr.splice(to, 0, moved);
+    handleColorsReordered(arr);
+    complete();
   };
 
   const handleShuffle = () => {
@@ -156,10 +132,8 @@ const PaletteCreator: React.FC = () => {
     handleColorsReordered(shuffled);
   };
 
-  // Legacy version - accepts array of { friendId, deviceId }
-  const handleSendToFriends = async (
-    recipients: { friendId: string; deviceId: string }[]
-  ) => {
+  // Simplified version - accepts array of friendIds
+  const handleSendToFriends = async (friendIds: string[]) => {
     if (!user) {
       showMessage("Please login to send palettes", "danger");
       return;
@@ -173,54 +147,7 @@ const PaletteCreator: React.FC = () => {
     try {
       setIsLoading(true);
 
-      // Use the new enhanced API to send palette to friends
-      const { UsersService } = await import(
-        "../services/openapi/services/UsersService"
-      );
-
-      await UsersService.usersControllerSendPaletteToFriends({
-        friendIds: recipients.map((r) => r.friendId),
-        colors: currentPalette.colors.map((color) => color.hex),
-        imageUrl:
-          currentPalette.source === "camera"
-            ? currentPalette.imageUrl
-            : undefined,
-      });
-
-      showMessage(
-        `Palette sent to ${recipients.length} recipient${
-          recipients.length !== 1 ? "s" : ""
-        }!`
-      );
-
-      setTimeout(() => {
-        setCurrentPalette(null);
-        setShowFriendSelector(false);
-      }, 2000);
-    } catch (error) {
-      console.error("Error sending palette:", error);
-      showMessage("Failed to send palette", "danger");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Enhanced version - accepts array of friendIds directly
-  const handleSendToFriendsEnhanced = async (friendIds: string[]) => {
-    if (!user) {
-      showMessage("Please login to send palettes", "danger");
-      return;
-    }
-
-    if (!currentPalette) {
-      showMessage("No palette to send", "danger");
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-
-      // Use the new enhanced API to send palette to friends
+      // Use the enhanced API to send palette to friends
       const { UsersService } = await import(
         "../services/openapi/services/UsersService"
       );
@@ -251,6 +178,8 @@ const PaletteCreator: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  // Note: Enhanced friendIds-only sender removed (unused) to avoid lint warnings.
 
   const copyColorToClipboard = async (color: ExtractedColor) => {
     try {
@@ -367,42 +296,26 @@ const PaletteCreator: React.FC = () => {
                     </IonButton>
                   </div>
 
-                  <IonGrid>
-                    <IonRow>
+                  <IonList>
+                    <IonReorderGroup
+                      disabled={isLoading}
+                      onIonItemReorder={handleItemReorder}
+                    >
                       {currentPalette.colors.map((color, index) => (
-                        <IonCol
-                          size="6"
-                          sizeMd="4"
-                          sizeLg="2"
-                          key={`${color.hex}-${index}`}
-                        >
+                        <IonItem key={`${color.hex}-${index}`}>
                           <div
-                            className={`color-tile ${
-                              dragOverIndex === index ? "drag-over" : ""
-                            }`}
-                            draggable
-                            onDragStart={(e) => handleDragStart(e, index)}
-                            onDragOver={(e) => handleDragOver(e, index)}
-                            onDragLeave={handleDragLeave}
-                            onDrop={(e) => handleDrop(e, index)}
-                            onClick={() => copyColorToClipboard(color)}
                             style={{
                               backgroundColor: color.hex,
-                              height: "80px",
+                              height: "64px",
                               borderRadius: "8px",
                               border: "2px solid #ddd",
-                              cursor: "grab",
                               display: "flex",
                               alignItems: "center",
                               justifyContent: "center",
-                              marginBottom: "8px",
-                              opacity: draggedIndex === index ? 0.5 : 1,
-                              transform:
-                                dragOverIndex === index
-                                  ? "scale(1.05)"
-                                  : "scale(1)",
-                              transition: "transform 0.2s ease",
+                              width: "100%",
+                              margin: "8px 0",
                             }}
+                            onClick={() => copyColorToClipboard(color)}
                           >
                             <div
                               style={{
@@ -417,10 +330,11 @@ const PaletteCreator: React.FC = () => {
                               <div>{color.hex}</div>
                             </div>
                           </div>
-                        </IonCol>
+                          <IonReorder slot="end" />
+                        </IonItem>
                       ))}
-                    </IonRow>
-                  </IonGrid>
+                    </IonReorderGroup>
+                  </IonList>
 
                   <div style={{ marginTop: "16px" }}>
                     {currentPalette.colors.map((color, index) => (
@@ -483,11 +397,13 @@ const PaletteCreator: React.FC = () => {
           )}
         </div>
 
-        <FriendSelector
+        <FriendSelectorEnhanced
           isOpen={showFriendSelector}
           onClose={() => setShowFriendSelector(false)}
           onSendToFriends={handleSendToFriends}
           isLoading={isLoading}
+          title="Send Palette to Friends"
+          includeUserSelf={true}
         />
 
         {isLoading && (

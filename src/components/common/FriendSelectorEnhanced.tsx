@@ -81,6 +81,8 @@ export const FriendSelectorEnhanced: React.FC<FriendSelectorEnhancedProps> = ({
     setSendError(null);
     const recipientFriendIds: string[] = [];
 
+    // TODO: Testing workaround - allow sending to self without device
+    // Remove this condition in production - should validate device availability
     // Add self if selected and user exists
     if (sendToSelf && user && includeUserSelf) {
       recipientFriendIds.push(user.id);
