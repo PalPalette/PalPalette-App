@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   IonButton,
   IonIcon,
@@ -11,8 +11,11 @@ import {
   IonText,
   IonCard,
   IonCardContent,
+  IonList,
+  IonReorder,
+  IonReorderGroup,
 } from "@ionic/react";
-import { add, remove, colorPalette } from "ionicons/icons";
+import { add, remove, colorPalette, pencil, shuffle } from "ionicons/icons";
 
 interface ColorPickerProps {
   onColorsSelected: (colors: string[]) => void;
@@ -29,7 +32,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
 }) => {
   const [colors, setColors] = useState<string[]>(["#FF5733", "#33FF57"]);
   const [customColor, setCustomColor] = useState("#3357FF");
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const colorInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Predefined color palette suggestions - more diverse and distinct colors
   const presetColors = [
@@ -94,30 +97,31 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
     }
   };
 
-  const handleDragStart = (index: number) => {
-    setDraggedIndex(index);
-  };
-
-  const handleDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
-    if (draggedIndex === null || draggedIndex === index) return;
-
-    const newColors = [...colors];
-    const draggedColor = newColors[draggedIndex];
-    newColors.splice(draggedIndex, 1);
-    newColors.splice(index, 0, draggedColor);
-
-    setColors(newColors);
-    setDraggedIndex(index);
+  const handleItemReorder = (event: CustomEvent) => {
+    type ReorderDetail = { from: number; to: number; complete: () => void };
+    const { from, to, complete } = (
+      event as unknown as { detail: ReorderDetail }
+    ).detail;
+    const arr = [...colors];
+    const [moved] = arr.splice(from, 1);
+    arr.splice(to, 0, moved);
+    setColors(arr);
+    complete();
 
     // Only call onColorsSelected if showConfirmButton is false (immediate mode)
     if (!showConfirmButton) {
-      onColorsSelected(newColors);
+      onColorsSelected(arr);
     }
   };
 
-  const handleDragEnd = () => {
-    setDraggedIndex(null);
+  const handleShuffle = () => {
+    const shuffled = [...colors].sort(() => Math.random() - 0.5);
+    setColors(shuffled);
+
+    // Only call onColorsSelected if showConfirmButton is false (immediate mode)
+    if (!showConfirmButton) {
+      onColorsSelected(shuffled);
+    }
   };
 
   const confirmSelection = () => {
@@ -156,52 +160,79 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
               Your Colors ({colors.length}/{maxColors})
             </h4>
           </IonText>
-          <IonGrid style={{ padding: "0" }}>
-            <IonRow>
+
+          <div style={{ marginBottom: "12px", textAlign: "center" }}>
+            <IonButton fill="outline" size="small" onClick={handleShuffle}>
+              <IonIcon icon={shuffle} slot="start" />
+              Shuffle Colors
+            </IonButton>
+          </div>
+
+          <IonList>
+            <IonReorderGroup
+              disabled={false}
+              onIonItemReorder={handleItemReorder}
+            >
               {colors.map((color, index) => (
-                <IonCol
-                  size="6"
-                  sizeMd="4"
-                  sizeLg="3"
-                  key={index}
-                  style={{ padding: "4px" }}
-                >
+                <IonItem key={`${color}-${index}`} lines="none">
                   <div
-                    style={{ position: "relative", cursor: "grab" }}
-                    draggable
-                    onDragStart={() => handleDragStart(index)}
-                    onDragOver={(e) => handleDragOver(e, index)}
-                    onDragEnd={handleDragEnd}
+                    style={{
+                      backgroundColor: color,
+                      height: "64px",
+                      borderRadius: "8px",
+                      border: "2px solid #ddd",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: "100%",
+                      margin: "8px 0",
+                      userSelect: "none",
+                      touchAction: "manipulation",
+                      WebkitTouchCallout: "none",
+                      position: "relative",
+                    }}
+                    onContextMenu={(e) => e.preventDefault()}
                   >
-                    <input
-                      type="color"
-                      value={color}
-                      onChange={(e) => updateColor(index, e.target.value)}
-                      style={{
-                        width: "100%",
-                        height: "60px",
-                        border: "2px solid #ddd",
-                        borderRadius: "8px",
-                        cursor: "pointer",
-                      }}
-                    />
                     <div
                       style={{
-                        position: "absolute",
-                        bottom: "4px",
-                        left: "4px",
-                        right: "4px",
                         background: "rgba(0,0,0,0.7)",
                         color: "white",
-                        fontSize: "10px",
-                        textAlign: "center",
+                        padding: "4px 8px",
                         borderRadius: "4px",
-                        padding: "2px",
-                        pointerEvents: "none",
+                        fontSize: "12px",
+                        textAlign: "center",
                       }}
                     >
-                      {color}
+                      <div>{color}</div>
                     </div>
+
+                    {/* Edit Button */}
+                    <IonButton
+                      fill="clear"
+                      size="small"
+                      style={{
+                        position: "absolute",
+                        top: "4px",
+                        left: "4px",
+                        width: "32px",
+                        height: "32px",
+                        borderRadius: "50%",
+                        background: "white",
+                        minHeight: "32px",
+                        minWidth: "32px",
+                        margin: 0,
+                      }}
+                      onClick={() => colorInputRefs.current[index]?.click()}
+                    >
+                      <IonIcon
+                        slot="icon-only"
+                        icon={pencil}
+                        color="primary"
+                        style={{ fontSize: "16px" }}
+                      />
+                    </IonButton>
+
+                    {/* Remove Button */}
                     {colors.length > minColors && (
                       <IonButton
                         fill="clear"
@@ -209,14 +240,15 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
                         color="danger"
                         style={{
                           position: "absolute",
-                          top: "-8px",
-                          right: "-8px",
-                          width: "24px",
-                          height: "24px",
+                          top: "4px",
+                          right: "4px",
+                          width: "32px",
+                          height: "32px",
                           borderRadius: "50%",
                           background: "white",
-                          minHeight: "24px",
-                          minWidth: "24px",
+                          minHeight: "32px",
+                          minWidth: "32px",
+                          margin: 0,
                         }}
                         onClick={() => removeColor(index)}
                       >
@@ -224,15 +256,33 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
                           slot="icon-only"
                           icon={remove}
                           color="danger"
-                          style={{ fontSize: "14px" }}
+                          style={{ fontSize: "16px" }}
                         />
                       </IonButton>
                     )}
+
+                    {/* Hidden Color Picker Input */}
+                    <input
+                      ref={(el) => {
+                        colorInputRefs.current[index] = el;
+                      }}
+                      type="color"
+                      value={color}
+                      onChange={(e) => updateColor(index, e.target.value)}
+                      style={{
+                        position: "absolute",
+                        opacity: 0,
+                        width: "1px",
+                        height: "1px",
+                        pointerEvents: "none",
+                      }}
+                    />
                   </div>
-                </IonCol>
+                  <IonReorder slot="end" />
+                </IonItem>
               ))}
-            </IonRow>
-          </IonGrid>
+            </IonReorderGroup>
+          </IonList>
         </div>
 
         {/* Add Custom Color */}
@@ -312,9 +362,9 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
         <div style={{ marginTop: "16px", textAlign: "center" }}>
           <IonText color="medium">
             <p style={{ fontSize: "14px", margin: "8px 0" }}>
-              💡 Tap a color to edit it, or drag to reorder. Use presets below
-              for quick selection. You need at least {minColors} colors and can
-              have up to {maxColors}.
+              💡 Drag colors to reorder them. Tap the pencil to edit or X to
+              remove. Use presets below for quick selection. You need at least{" "}
+              {minColors} colors and can have up to {maxColors}.
             </p>
           </IonText>
         </div>

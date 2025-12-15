@@ -12,16 +12,12 @@ import {
   IonCard,
   IonCardContent,
   IonText,
-  IonList,
-  IonItem,
-  IonReorder,
-  IonReorderGroup,
   IonChip,
   IonLabel,
   IonSegment,
   IonSegmentButton,
 } from "@ionic/react";
-import { send, camera, shuffle, brush } from "ionicons/icons";
+import { send, camera, brush } from "ionicons/icons";
 import { PhotoPicker } from "../components/common";
 import { ColorPicker } from "../components/common/ColorPicker";
 import { FriendSelectorEnhanced } from "../components/common/FriendSelectorEnhanced";
@@ -39,7 +35,6 @@ const PaletteCreator: React.FC = () => {
   const [currentPalette, setCurrentPalette] = useState<ColorPalette | null>(
     null
   );
-  // Reorder state handled by IonReorderGroup; legacy indices removed
   const [showFriendSelector, setShowFriendSelector] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showToast, setShowToast] = useState(false);
@@ -57,7 +52,7 @@ const PaletteCreator: React.FC = () => {
 
   const handlePaletteExtracted = (palette: ColorPalette) => {
     setCurrentPalette(palette);
-    showMessage("Colors extracted! Arrange them and send to friends!");
+    showMessage("Palette ready! Review and send to friends!");
   };
 
   const handleManualColorsSelected = (colors: string[]) => {
@@ -76,7 +71,7 @@ const PaletteCreator: React.FC = () => {
       source: "gallery", // Use gallery as closest match for manual
       imageUrl: undefined, // No image for manual palettes
     });
-    showMessage("Custom palette created! Arrange colors and send to friends!");
+    showMessage("Palette ready! Review and send to friends!");
   };
 
   // Helper function to convert hex to RGB as tuple
@@ -103,36 +98,6 @@ const PaletteCreator: React.FC = () => {
     return "Mixed";
   };
 
-  const handleColorsReordered = (colors: ExtractedColor[]) => {
-    if (currentPalette) {
-      setCurrentPalette({
-        ...currentPalette,
-        colors,
-      });
-    }
-  };
-
-  // IonReorderGroup handler for cross-platform drag & drop
-  const handleItemReorder = (event: CustomEvent) => {
-    if (!currentPalette) return;
-    type ReorderDetail = { from: number; to: number; complete: () => void };
-    const { from, to, complete } = (
-      event as unknown as { detail: ReorderDetail }
-    ).detail;
-    const arr = [...currentPalette.colors];
-    const [moved] = arr.splice(from, 1);
-    arr.splice(to, 0, moved);
-    handleColorsReordered(arr);
-    complete();
-  };
-
-  const handleShuffle = () => {
-    if (!currentPalette) return;
-    const shuffled = [...currentPalette.colors].sort(() => Math.random() - 0.5);
-    handleColorsReordered(shuffled);
-  };
-
-  // Simplified version - accepts array of friendIds
   const handleSendToFriends = async (friendIds: string[]) => {
     if (!user) {
       showMessage("Please login to send palettes", "danger");
@@ -286,60 +251,72 @@ const PaletteCreator: React.FC = () => {
                   )}
 
                   <div style={{ marginBottom: "16px", textAlign: "center" }}>
-                    <IonButton
-                      fill="outline"
-                      size="small"
-                      onClick={handleShuffle}
-                    >
-                      <IonIcon icon={shuffle} slot="start" />
-                      Shuffle Colors
-                    </IonButton>
+                    <IonText>
+                      <h3>Your Color Palette</h3>
+                      <p
+                        style={{
+                          fontSize: "14px",
+                          color: "var(--ion-color-medium)",
+                        }}
+                      >
+                        {currentPalette.colors.length} colors ready to send
+                      </p>
+                    </IonText>
                   </div>
 
-                  <IonList>
-                    <IonReorderGroup
-                      disabled={isLoading}
-                      onIonItemReorder={handleItemReorder}
-                    >
-                      {currentPalette.colors.map((color, index) => (
-                        <IonItem key={`${color.hex}-${index}`}>
-                          <div
-                            style={{
-                              backgroundColor: color.hex,
-                              height: "64px",
-                              borderRadius: "8px",
-                              border: "2px solid #ddd",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              width: "100%",
-                              margin: "8px 0",
-                              userSelect: "none",
-                              touchAction: "manipulation",
-                              WebkitTouchCallout: "none",
-                            }}
-                            onContextMenu={(e) => e.preventDefault()}
-                          >
-                            <div
-                              style={{
-                                background: "rgba(0,0,0,0.7)",
-                                color: "white",
-                                padding: "4px 8px",
-                                borderRadius: "4px",
-                                fontSize: "12px",
-                                textAlign: "center",
-                              }}
-                            >
-                              <div>{color.hex}</div>
-                            </div>
-                          </div>
-                          <IonReorder slot="end" />
-                        </IonItem>
-                      ))}
-                    </IonReorderGroup>
-                  </IonList>
+                  {/* Color Preview Grid */}
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fit, minmax(80px, 1fr))",
+                      gap: "12px",
+                      marginBottom: "16px",
+                    }}
+                  >
+                    {currentPalette.colors.map((color, index) => (
+                      <div
+                        key={`${color.hex}-${index}`}
+                        style={{
+                          backgroundColor: color.hex,
+                          height: "80px",
+                          borderRadius: "8px",
+                          border: "2px solid #ddd",
+                          display: "flex",
+                          alignItems: "flex-end",
+                          justifyContent: "center",
+                          padding: "8px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            background: "rgba(0,0,0,0.7)",
+                            color: "white",
+                            padding: "4px 8px",
+                            borderRadius: "4px",
+                            fontSize: "11px",
+                            textAlign: "center",
+                          }}
+                        >
+                          {color.hex}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
 
+                  {/* Color Chips for copying */}
                   <div style={{ marginTop: "16px" }}>
+                    <IonText>
+                      <p
+                        style={{
+                          fontSize: "14px",
+                          fontWeight: "bold",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        Tap to copy hex codes:
+                      </p>
+                    </IonText>
                     {currentPalette.colors.map((color, index) => (
                       <IonChip
                         key={`chip-${color.hex}-${index}`}
@@ -375,15 +352,6 @@ const PaletteCreator: React.FC = () => {
                       Start Over
                     </IonButton>
                   </div>
-
-                  {creationMode === "photo" && (
-                    <div style={{ marginTop: "12px" }}>
-                      <PhotoPicker
-                        onPaletteExtracted={handlePaletteExtracted}
-                        onError={(error) => showMessage(error, "danger")}
-                      />
-                    </div>
-                  )}
                 </IonCardContent>
               </IonCard>
 
@@ -392,8 +360,8 @@ const PaletteCreator: React.FC = () => {
                 style={{ fontSize: "14px", marginTop: "16px" }}
               >
                 <p>
-                  💡 Drag colors to reorder them, tap to copy hex codes. Once
-                  you're happy with the arrangement, send them to your friends!
+                  💡 Review your palette and tap chips to copy hex codes. When
+                  ready, send it to your friends!
                 </p>
               </IonText>
             </div>
