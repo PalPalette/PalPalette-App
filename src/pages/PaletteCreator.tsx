@@ -314,8 +314,11 @@ const PaletteCreator: React.FC = () => {
                               justifyContent: "center",
                               width: "100%",
                               margin: "8px 0",
+                              userSelect: "none",
+                              touchAction: "manipulation",
+                              WebkitTouchCallout: "none",
                             }}
-                            onClick={() => copyColorToClipboard(color)}
+                            onContextMenu={(e) => e.preventDefault()}
                           >
                             <div
                               style={{
