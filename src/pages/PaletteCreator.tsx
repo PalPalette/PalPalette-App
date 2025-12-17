@@ -120,10 +120,6 @@ const PaletteCreator: React.FC = () => {
       await UsersService.usersControllerSendPaletteToFriends({
         friendIds: friendIds,
         colors: currentPalette.colors.map((color) => color.hex),
-        imageUrl:
-          currentPalette.source === "camera"
-            ? currentPalette.imageUrl
-            : undefined,
       });
 
       showMessage(
