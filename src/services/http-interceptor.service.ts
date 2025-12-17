@@ -47,6 +47,9 @@ export class HttpInterceptorService {
 
   /**
    * Setup the fetch interceptor
+   * NOTE: This interceptor does NOT add Authorization headers.
+   * OpenAPI.TOKEN handles all token injection automatically.
+   * This interceptor ONLY handles 401 responses and token refresh.
    */
   private setupInterceptor() {
     // Store original fetch
@@ -57,15 +60,10 @@ export class HttpInterceptorService {
       input: RequestInfo | URL,
       init?: RequestInit
     ): Promise<Response> => {
-      // Get the current access token
-      const { accessToken } = await SecureStorageService.getTokens();
-
-      // Create request with token
-      const requestInit = this.createRequestWithAuth(init, accessToken);
-
       try {
-        // Make the request
-        const response = await originalFetch(input, requestInit);
+        // Make the request WITHOUT modifying it
+        // OpenAPI.TOKEN will handle adding the Authorization header
+        const response = await originalFetch(input, init);
 
         // If unauthorized and we have a refresh token, try to refresh
         if (response.status === 401) {
@@ -74,10 +72,10 @@ export class HttpInterceptorService {
           const newToken = await this.handleUnauthorized();
 
           if (newToken) {
-            // Retry with new token
-            const retryInit = this.createRequestWithAuth(init, newToken);
-            console.log("✅ Retrying request with new token...");
-            return await originalFetch(input, retryInit);
+            // Retry the original request WITHOUT modifying it
+            // OpenAPI.TOKEN will be called again and use the refreshed token
+            console.log("✅ Retrying request with refreshed token...");
+            return await originalFetch(input, init);
           } else {
             // If refresh failed, let the 401 through
             console.log("❌ Token refresh failed, letting 401 through");
@@ -101,25 +99,6 @@ export class HttpInterceptorService {
         });
         throw error;
       }
-    };
-  }
-
-  /**
-   * Create request init with authorization header
-   */
-  private createRequestWithAuth(
-    init?: RequestInit,
-    token?: string | null
-  ): RequestInit {
-    const headers = new Headers(init?.headers);
-
-    if (token) {
-      headers.set("Authorization", `Bearer ${token}`);
-    }
-
-    return {
-      ...init,
-      headers,
     };
   }
 
@@ -159,7 +138,7 @@ export class HttpInterceptorService {
       ]);
 
       if (success) {
-        // Get the new token
+        // Get the new token from storage (OpenAPI.TOKEN will use this)
         const { accessToken } = await SecureStorageService.getTokens();
 
         if (accessToken) {
@@ -170,10 +149,16 @@ export class HttpInterceptorService {
         }
       }
 
+      // Refresh failed - this will trigger logout in AuthContext
+      console.warn("⚠️ Token refresh returned false - user will be logged out");
       throw new Error("Token refresh failed");
     } catch (error) {
       console.error("❌ Token refresh failed:", error);
+      // Process queue with error - all queued requests will fail
       this.processQueue(error as Error, null);
+
+      // Note: globalRefreshTokensFn() calls clearAuthState() which sets status to "unauthenticated"
+      // This will trigger the ProtectedRoute to redirect to login
       return null;
     } finally {
       this.isRefreshing = false;

@@ -71,17 +71,29 @@ export class SecureStorageService {
   }
 
   /**
-   * Store authentication tokens securely
+   * Store authentication tokens securely with expiry timestamp
    */
   static async storeTokens(
     accessToken: string,
-    refreshToken: string
+    refreshToken: string,
+    expiresIn?: number
   ): Promise<void> {
     try {
-      await Promise.all([
+      const promises = [
         this.setItem("access_token", accessToken),
         this.setItem("refresh_token", refreshToken),
-      ]);
+      ];
+
+      // Store expiry timestamp if provided (expiresIn is in seconds)
+      if (expiresIn) {
+        const expiresAt = Date.now() + expiresIn * 1000;
+        promises.push(this.setItem("token_expires_at", expiresAt.toString()));
+        console.log(
+          `🕐 Token will expire at: ${new Date(expiresAt).toISOString()}`
+        );
+      }
+
+      await Promise.all(promises);
     } catch (error) {
       console.error("Failed to store tokens securely:", error);
       throw error;
@@ -89,21 +101,26 @@ export class SecureStorageService {
   }
 
   /**
-   * Get stored authentication tokens
+   * Get stored authentication tokens with expiry info
    */
   static async getTokens(): Promise<{
     accessToken: string | null;
     refreshToken: string | null;
+    expiresAt: number | null;
   }> {
     try {
-      const [accessToken, refreshToken] = await Promise.all([
+      const [accessToken, refreshToken, expiresAtStr] = await Promise.all([
         this.getItem("access_token"),
         this.getItem("refresh_token"),
+        this.getItem("token_expires_at"),
       ]);
-      return { accessToken, refreshToken };
+
+      const expiresAt = expiresAtStr ? parseInt(expiresAtStr, 10) : null;
+
+      return { accessToken, refreshToken, expiresAt };
     } catch (error) {
       console.error("Failed to retrieve tokens from secure storage:", error);
-      return { accessToken: null, refreshToken: null };
+      return { accessToken: null, refreshToken: null, expiresAt: null };
     }
   }
 
@@ -115,6 +132,7 @@ export class SecureStorageService {
       await Promise.all([
         this.removeItem("access_token"),
         this.removeItem("refresh_token"),
+        this.removeItem("token_expires_at"),
         this.removeItem("user"),
         // Clear legacy tokens too
         this.removeItem("auth_token"),

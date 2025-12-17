@@ -6,6 +6,7 @@ import React, {
   useCallback,
   useRef,
 } from "react";
+import { App } from "@capacitor/app";
 import { AuthenticationService } from "../services/openapi";
 import { PushNotificationsService } from "../services/openapi";
 import { PushService } from "../services/PushService";
@@ -53,7 +54,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
+  const [tokenExpiresAt, setTokenExpiresAt] = useState<number | null>(null);
   const isLoggingOut = useRef(false);
+  const refreshTokensRef = useRef<(() => Promise<boolean>) | null>(null);
+
+  /**
+   * Check if token is expired or expiring soon
+   */
+  const isTokenExpiringSoon = useCallback(
+    (expiresAt: number | null): boolean => {
+      if (!expiresAt) return false;
+
+      const now = Date.now();
+      const timeUntilExpiry = expiresAt - now;
+      const fiveMinutes = 5 * 60 * 1000;
+
+      // Return true if token expires in less than 5 minutes
+      return timeUntilExpiry < fiveMinutes;
+    },
+    []
+  );
+
+  /**
+   * Check if token is completely expired
+   */
+  const isTokenExpired = useCallback((expiresAt: number | null): boolean => {
+    if (!expiresAt) return false;
+    return Date.now() >= expiresAt;
+  }, []);
 
   /**
    * Helper to clear auth state (used by logout and token refresh failure)
@@ -69,6 +97,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await SecureStorageService.clearTokens();
       setToken(null);
       setRefreshToken(null);
+      setTokenExpiresAt(null);
       setUser(null);
       setStatus("unauthenticated");
       console.log("✅ Auth state cleared");
@@ -82,8 +111,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
    */
   const loadStoredAuth = useCallback(async () => {
     try {
-      const { accessToken, refreshToken } =
-        await SecureStorageService.getTokens();
+      const {
+        accessToken,
+        refreshToken: storedRefreshToken,
+        expiresAt,
+      } = await SecureStorageService.getTokens();
       const userData = await SecureStorageService.getUser();
 
       if (
@@ -94,14 +126,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         userData.displayName
       ) {
         setToken(accessToken);
-        setRefreshToken(refreshToken);
+        setRefreshToken(storedRefreshToken);
+        setTokenExpiresAt(expiresAt);
         setUser({
           id: userData.id as string,
           email: userData.email as string,
           displayName: userData.displayName as string,
         });
-        setStatus("authenticated");
-        console.log("✅ Loaded stored authentication data");
+
+        // Check if token is expired or expiring soon
+        if (isTokenExpired(expiresAt)) {
+          console.log("⏰ Token is expired, refreshing...");
+          // Don't set status to authenticated yet, try to refresh first
+          if (refreshTokensRef.current) {
+            await refreshTokensRef.current();
+          }
+        } else if (isTokenExpiringSoon(expiresAt)) {
+          console.log("⏰ Token expiring soon, refreshing proactively...");
+          setStatus("authenticated"); // Set authenticated first so app works
+          // Refresh in background
+          if (refreshTokensRef.current) {
+            void refreshTokensRef.current();
+          }
+        } else {
+          setStatus("authenticated");
+          console.log("✅ Loaded stored authentication data");
+        }
       } else {
         console.warn("⚠️ Incomplete stored auth data, clearing");
         await SecureStorageService.clearTokens();
@@ -111,10 +161,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.error("❌ Failed to load stored auth data:", error);
       setToken(null);
       setRefreshToken(null);
+      setTokenExpiresAt(null);
       setUser(null);
       setStatus("unauthenticated");
     }
-  }, []);
+  }, [isTokenExpired, isTokenExpiringSoon]);
 
   /**
    * Refresh user data from server
@@ -166,15 +217,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         ReturnType<typeof AuthenticationService.authControllerRefresh>
       >;
 
-      // Store new tokens
+      // Store new tokens with expiry
       await SecureStorageService.storeTokens(
         response.access_token,
-        response.refresh_token
+        response.refresh_token,
+        response.expires_in
       );
       await SecureStorageService.storeUser(response.user);
 
+      const newExpiresAt = response.expires_in
+        ? Date.now() + response.expires_in * 1000
+        : null;
+
       setToken(response.access_token);
       setRefreshToken(response.refresh_token);
+      setTokenExpiresAt(newExpiresAt);
       setUser({
         id: response.user.id!,
         email: response.user.email!,
@@ -191,6 +248,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return false;
     }
   }, [clearAuthState]);
+
+  // Store refreshTokens in ref for use in loadStoredAuth and lifecycle handlers
+  useEffect(() => {
+    refreshTokensRef.current = refreshTokens;
+  }, [refreshTokens]);
 
   /**
    * Login with email and password
@@ -213,17 +275,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         loginData
       );
 
-      // Store tokens and user data
+      // Store tokens and user data with expiry
       await SecureStorageService.storeTokens(
         response.access_token,
-        response.refresh_token
+        response.refresh_token,
+        response.expires_in
       );
       await SecureStorageService.storeUser(response.user);
 
       const userData = response.user;
       if (userData.id && userData.email && userData.displayName) {
+        const expiresAt = response.expires_in
+          ? Date.now() + response.expires_in * 1000
+          : null;
+
         setToken(response.access_token);
         setRefreshToken(response.refresh_token);
+        setTokenExpiresAt(expiresAt);
         setUser({
           id: userData.id,
           email: userData.email,
@@ -280,10 +348,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       );
 
       // Now registration returns the same structure as login
-      const { access_token, refresh_token, user: userData } = data;
+      const { access_token, refresh_token, user: userData, expires_in } = data;
 
       if (userData && userData.id && userData.email && userData.displayName) {
-        await SecureStorageService.storeTokens(access_token, refresh_token);
+        await SecureStorageService.storeTokens(
+          access_token,
+          refresh_token,
+          expires_in
+        );
 
         // Map the API response to our User interface
         const user: User = {
@@ -292,11 +364,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           displayName: userData.displayName,
         };
 
+        const expiresAt = expires_in ? Date.now() + expires_in * 1000 : null;
+
         await SecureStorageService.storeUser(
           user as unknown as Record<string, unknown>
         );
         setToken(access_token);
         setRefreshToken(refresh_token);
+        setTokenExpiresAt(expiresAt);
         setUser(user);
         setStatus("authenticated");
         console.log("✅ Registration successful");
@@ -379,6 +454,41 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     }
   }, [user, token, status]);
+
+  // App lifecycle: validate token when app resumes from background
+  useEffect(() => {
+    const appStateListener = App.addListener(
+      "appStateChange",
+      async ({ isActive }) => {
+        if (isActive && status === "authenticated") {
+          console.log("📱 App resumed, checking token validity...");
+
+          const { expiresAt } = await SecureStorageService.getTokens();
+
+          if (isTokenExpired(expiresAt)) {
+            console.log(
+              "⏰ Token expired while app was backgrounded, refreshing..."
+            );
+            if (refreshTokensRef.current) {
+              await refreshTokensRef.current();
+            }
+          } else if (isTokenExpiringSoon(expiresAt)) {
+            console.log("⏰ Token expiring soon, refreshing proactively...");
+            if (refreshTokensRef.current) {
+              void refreshTokensRef.current();
+            }
+          } else {
+            console.log("✅ Token still valid");
+          }
+        }
+      }
+    );
+
+    // Cleanup listener on unmount
+    return () => {
+      appStateListener.then((listener) => listener.remove());
+    };
+  }, [status, isTokenExpired, isTokenExpiringSoon]);
 
   const value: AuthContextType = {
     status,
