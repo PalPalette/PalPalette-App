@@ -55,7 +55,9 @@ const Devices: React.FC = () => {
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [authNotificationDevice, setAuthNotificationDevice] =
     useState<Device | null>(null);
-  const [testingLightingId, setTestingLightingId] = useState<string | null>(null);
+  const [testingLightingId, setTestingLightingId] = useState<string | null>(
+    null
+  );
   const [toastMessage, setToastMessage] = useState("");
   const [toastColor, setToastColor] = useState<"success" | "danger">("success");
   const [showToast, setShowToast] = useState(false);
