@@ -37,10 +37,7 @@ import {
   DeviceSettingsModal,
   SetupWizardModal,
 } from "../components/devices";
-import {
-  LightingSystemCard,
-  LightingConfigSimple,
-} from "../components/lighting";
+import { LightingConfigSimple } from "../components/lighting";
 import { DeviceAuthNotification } from "../components/notifications";
 
 const Devices: React.FC = () => {
@@ -144,6 +141,17 @@ const Devices: React.FC = () => {
     return `${days}d ago`;
   };
 
+  const getLightingSystemStatus = (device: Device) => {
+    if (!device.lightingSystemConfigured) {
+      return { configured: false, type: null, status: null };
+    }
+    return {
+      configured: true,
+      type: device.lightingSystemType,
+      status: device.lightingStatus,
+    };
+  };
+
   const DeviceCard: React.FC<{ device: Device }> = ({ device }) => (
     <IonCard>
       <IonCardHeader>
@@ -208,8 +216,8 @@ const Devices: React.FC = () => {
             <IonLabel>
               <h3>Setup Status</h3>
               <p>
-                <IonBadge color={device.isProvisioned ? "success" : "warning"}>
-                  {device.isProvisioned ? "Configured" : "Setup Required"}
+                <IonBadge color={device.isOnline ? "success" : "medium"}>
+                  {device.isOnline ? "Ready" : "Offline"}
                 </IonBadge>
               </p>
             </IonLabel>
@@ -222,15 +230,47 @@ const Devices: React.FC = () => {
               <p>{formatLastSeen(device.lastSeenAt)}</p>
             </IonLabel>
           </IonItem>
+
+          {/* Lighting System Status */}
+          <IonItem lines="none">
+            <IonLabel>
+              <h3>Lighting System</h3>
+              <p>
+                {getLightingSystemStatus(device).configured ? (
+                  <>
+                    <IonBadge
+                      color={
+                        getLightingSystemStatus(device).status === "working"
+                          ? "success"
+                          : "warning"
+                      }
+                    >
+                      {getLightingSystemStatus(device).type?.toUpperCase()}{" "}
+                      {getLightingSystemStatus(device).status}
+                    </IonBadge>
+                  </>
+                ) : (
+                  <IonBadge color="medium">Not Configured</IonBadge>
+                )}
+              </p>
+            </IonLabel>
+          </IonItem>
         </IonList>
 
-        {/* Add lighting system card for all claimed devices */}
-        <div style={{ marginTop: "16px" }}>
-          <LightingSystemCard
-            deviceId={device.id}
-            onConfigureClick={() => handleLightingConfig(device)}
-          />
-        </div>
+        {/* Show configure button if lighting is not configured */}
+        {!getLightingSystemStatus(device).configured &&
+          device.isProvisioned && (
+            <div style={{ marginTop: "16px" }}>
+              <IonButton
+                expand="block"
+                onClick={() => handleLightingConfig(device)}
+                fill="outline"
+              >
+                <IonIcon icon={bulb} slot="start" />
+                Configure Lighting
+              </IonButton>
+            </div>
+          )}
       </IonCardContent>
     </IonCard>
   );
