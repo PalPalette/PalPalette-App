@@ -15,7 +15,8 @@ import {
   IonReorder,
   IonReorderGroup,
 } from "@ionic/react";
-import { add, remove, colorPalette, pencil, shuffle } from "ionicons/icons";
+import { add, remove, colorPalette, shuffle } from "ionicons/icons";
+import { HexColorPicker } from "react-colorful";
 
 interface ColorPickerProps {
   onColorsSelected: (colors: string[]) => void;
@@ -33,6 +34,10 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
   const [colors, setColors] = useState<string[]>(["#FF5733", "#33FF57"]);
   const [customColor, setCustomColor] = useState("#3357FF");
   const colorInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const [editingColorIndex, setEditingColorIndex] = useState<number | null>(
+    null
+  );
+  const [pickerColor, setPickerColor] = useState("#FF5733");
 
   // Predefined color palette suggestions - more diverse and distinct colors
   const presetColors = [
@@ -134,10 +139,30 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
     return /^#[0-9A-F]{6}$/i.test(color);
   };
 
+  const openColorPicker = (index: number) => {
+    setEditingColorIndex(index);
+    setPickerColor(colors[index]);
+  };
+
+  const closeColorPicker = () => {
+    setEditingColorIndex(null);
+  };
+
+  const saveColorFromPicker = () => {
+    if (editingColorIndex !== null) {
+      updateColor(editingColorIndex, pickerColor);
+      setEditingColorIndex(null);
+    }
+  };
+
+  const cancelColorEdit = () => {
+    setEditingColorIndex(null);
+  };
+
   return (
     <IonCard>
-      <IonCardContent>
-        <div style={{ textAlign: "center", marginBottom: "16px" }}>
+      <IonCardContent className="ion-padding-vertical">
+        <div className="ion-text-center ion-margin-bottom">
           <IonIcon
             icon={colorPalette}
             style={{
@@ -154,15 +179,15 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
         </div>
 
         {/* Current Colors */}
-        <div style={{ marginBottom: "20px" }}>
+        <div className="ion-margin-bottom">
           <IonText>
             <h4 style={{ margin: "0 0 12px 0", fontSize: "16px" }}>
               Your Colors ({colors.length}/{maxColors})
             </h4>
           </IonText>
 
-          <div style={{ marginBottom: "12px", textAlign: "center" }}>
-            <IonButton fill="outline" size="small" onClick={handleShuffle}>
+          <div className="ion-text-center ion-margin-bottom">
+            <IonButton fill="outline" onClick={handleShuffle}>
               <IonIcon icon={shuffle} slot="start" />
               Shuffle Colors
             </IonButton>
@@ -176,11 +201,15 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
               {colors.map((color, index) => (
                 <IonItem key={`${color}-${index}`} lines="none">
                   <div
+                    onClick={() => openColorPicker(index)}
                     style={{
                       backgroundColor: color,
-                      height: "64px",
-                      borderRadius: "8px",
-                      border: "2px solid #ddd",
+                      height: "80px",
+                      borderRadius: "12px",
+                      border:
+                        editingColorIndex === index
+                          ? "3px solid var(--ion-color-primary)"
+                          : "2px solid var(--ion-color-light)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -190,104 +219,135 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
                       touchAction: "manipulation",
                       WebkitTouchCallout: "none",
                       position: "relative",
+                      cursor: "pointer",
+                      transition: "opacity 0.2s ease, border 0.2s ease",
                     }}
                     onContextMenu={(e) => e.preventDefault()}
+                    onMouseOver={(e) => {
+                      (e.currentTarget as HTMLElement).style.opacity = "0.8";
+                    }}
+                    onMouseOut={(e) => {
+                      (e.currentTarget as HTMLElement).style.opacity = "1";
+                    }}
                   >
                     <div
                       style={{
                         background: "rgba(0,0,0,0.7)",
                         color: "white",
-                        padding: "4px 8px",
-                        borderRadius: "4px",
-                        fontSize: "12px",
+                        padding: "6px 12px",
+                        borderRadius: "6px",
+                        fontSize: "13px",
                         textAlign: "center",
+                        fontWeight: "500",
                       }}
                     >
                       <div>{color}</div>
                     </div>
 
-                    {/* Edit Button */}
-                    <IonButton
-                      fill="clear"
-                      size="small"
-                      style={{
-                        position: "absolute",
-                        top: "4px",
-                        left: "4px",
-                        width: "32px",
-                        height: "32px",
-                        borderRadius: "50%",
-                        background: "white",
-                        minHeight: "32px",
-                        minWidth: "32px",
-                        margin: 0,
-                      }}
-                      onClick={() => colorInputRefs.current[index]?.click()}
-                    >
-                      <IonIcon
-                        slot="icon-only"
-                        icon={pencil}
-                        color="primary"
-                        style={{ fontSize: "16px" }}
-                      />
-                    </IonButton>
-
                     {/* Remove Button */}
                     {colors.length > minColors && (
                       <IonButton
-                        fill="clear"
+                        fill="solid"
                         size="small"
                         color="danger"
                         style={{
                           position: "absolute",
-                          top: "4px",
-                          right: "4px",
-                          width: "32px",
-                          height: "32px",
+                          top: "8px",
+                          right: "8px",
+                          width: "40px",
+                          height: "40px",
                           borderRadius: "50%",
-                          background: "white",
-                          minHeight: "32px",
-                          minWidth: "32px",
+                          minHeight: "40px",
+                          minWidth: "40px",
                           margin: 0,
                         }}
-                        onClick={() => removeColor(index)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeColor(index);
+                        }}
                       >
                         <IonIcon
                           slot="icon-only"
                           icon={remove}
-                          color="danger"
-                          style={{ fontSize: "16px" }}
+                          color="light"
+                          style={{ fontSize: "18px" }}
                         />
                       </IonButton>
                     )}
-
-                    {/* Hidden Color Picker Input */}
-                    <input
-                      ref={(el) => {
-                        colorInputRefs.current[index] = el;
-                      }}
-                      type="color"
-                      value={color}
-                      onChange={(e) => updateColor(index, e.target.value)}
-                      style={{
-                        position: "absolute",
-                        opacity: 0,
-                        width: "1px",
-                        height: "1px",
-                        pointerEvents: "none",
-                      }}
-                    />
                   </div>
                   <IonReorder slot="end" />
                 </IonItem>
               ))}
             </IonReorderGroup>
           </IonList>
+
+          {/* Inline Color Picker */}
+          {editingColorIndex !== null && (
+            <div
+              style={{
+                marginTop: "20px",
+                padding: "16px",
+                borderRadius: "12px",
+                background: "rgba(var(--ion-color-primary-rgb), 0.05)",
+                border: "2px solid rgba(var(--ion-color-primary-rgb), 0.2)",
+              }}
+            >
+              <IonText>
+                <h4 style={{ margin: "0 0 16px 0", fontSize: "14px" }}>
+                  Edit Color
+                </h4>
+              </IonText>
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  marginBottom: "16px",
+                }}
+              >
+                <HexColorPicker color={pickerColor} onChange={setPickerColor} />
+              </div>
+
+              <div
+                style={{
+                  backgroundColor: pickerColor,
+                  height: "80px",
+                  borderRadius: "8px",
+                  border: "2px solid var(--ion-color-light)",
+                  marginBottom: "16px",
+                }}
+              />
+
+              <IonInput
+                value={pickerColor}
+                placeholder="#000000"
+                onIonInput={(e) => setPickerColor(e.detail.value || "")}
+                maxlength={7}
+              />
+
+              <div style={{ display: "flex", gap: "12px", marginTop: "16px" }}>
+                <IonButton
+                  expand="block"
+                  fill="outline"
+                  onClick={cancelColorEdit}
+                >
+                  Cancel
+                </IonButton>
+                <IonButton
+                  expand="block"
+                  color="primary"
+                  onClick={saveColorFromPicker}
+                >
+                  Save
+                </IonButton>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Add Custom Color */}
         {colors.length < maxColors && (
-          <div style={{ marginBottom: "20px" }}>
+          <div className="ion-margin-bottom">
             <IonItem>
               <IonLabel position="stacked">Add Custom Color</IonLabel>
               <IonInput
@@ -295,7 +355,6 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
                 placeholder="#3357FF"
                 onIonInput={(e) => setCustomColor(e.detail.value!)}
                 maxlength={7}
-                style={{ fontSize: "16px" }}
               />
               <IonButton
                 slot="end"
@@ -304,7 +363,6 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
                 disabled={
                   !isValidColor(customColor) || colors.includes(customColor)
                 }
-                style={{ minHeight: "44px", minWidth: "44px" }}
               >
                 <IonIcon icon={add} />
               </IonButton>
@@ -320,26 +378,20 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
                 Quick Add
               </h4>
             </IonText>
-            <IonGrid style={{ padding: "0" }}>
+            <IonGrid fixed>
               <IonRow>
                 {presetColors
                   .filter((color) => !colors.includes(color))
                   .slice(0, 12)
                   .map((color, index) => (
-                    <IonCol
-                      size="4"
-                      sizeMd="3"
-                      sizeLg="2"
-                      key={index}
-                      style={{ padding: "4px" }}
-                    >
+                    <IonCol size="3" sizeSm="3" sizeMd="2" key={index}>
                       <div
                         onClick={() => addColor(color)}
                         style={{
                           backgroundColor: color,
-                          height: "44px",
-                          borderRadius: "6px",
-                          border: "2px solid #ddd",
+                          height: "60px",
+                          borderRadius: "8px",
+                          border: "2px solid var(--ion-color-light)",
                           cursor: "pointer",
                           transition: "transform 0.2s ease",
                         }}
@@ -359,10 +411,10 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
           </div>
         )}
 
-        <div style={{ marginTop: "16px", textAlign: "center" }}>
+        <div className="ion-margin-top">
           <IonText color="medium">
-            <p style={{ fontSize: "14px", margin: "8px 0" }}>
-              💡 Drag colors to reorder them. Tap the pencil to edit or X to
+            <p style={{ fontSize: "13px", margin: "8px 0" }}>
+              💡 Drag colors to reorder them. Tap a color to edit it or X to
               remove. Use presets below for quick selection. You need at least{" "}
               {minColors} colors and can have up to {maxColors}.
             </p>
@@ -371,7 +423,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
 
         {/* Confirmation Button */}
         {showConfirmButton && (
-          <div style={{ marginTop: "20px", textAlign: "center" }}>
+          <div className="ion-margin-top">
             <IonButton
               expand="block"
               color="primary"
