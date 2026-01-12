@@ -81,8 +81,6 @@ export const FriendSelectorEnhanced: React.FC<FriendSelectorEnhancedProps> = ({
     setSendError(null);
     const recipientFriendIds: string[] = [];
 
-    // TODO: Testing workaround - allow sending to self without device
-    // Remove this condition in production - should validate device availability
     // Add self if selected and user exists
     if (sendToSelf && user && includeUserSelf) {
       recipientFriendIds.push(user.id);
@@ -90,6 +88,12 @@ export const FriendSelectorEnhanced: React.FC<FriendSelectorEnhancedProps> = ({
 
     // Add selected friends
     recipientFriendIds.push(...selectedFriendIds);
+
+    // Validate: at least one recipient selected
+    if (recipientFriendIds.length === 0) {
+      setSendError("Please select at least one recipient.");
+      return;
+    }
 
     // Filter out friends without devices
     const friendsWithDevices = friends.filter(
@@ -102,16 +106,20 @@ export const FriendSelectorEnhanced: React.FC<FriendSelectorEnhancedProps> = ({
         !friends.find((f) => f.id === fId && f.devices && f.devices.length > 0)
     );
 
+    // Warn about friends without devices (but don't block sending if self is included)
     if (friendsWithoutDevices.length > 0) {
-      setSendError(
+      console.warn(
         `Some friends don't have devices available: ${friendsWithoutDevices.length} friend(s)`
       );
     }
 
-    if (recipientFriendIds.length > 0 && friendsWithDevices.length > 0) {
-      onSendToFriends(selectedFriendIds); // Send only friends with devices
-    } else if (recipientFriendIds.length === 0) {
-      setSendError("Please select at least one recipient.");
+    // Check if we have at least one valid recipient (friends with devices OR sending to self)
+    const hasSendToSelf = sendToSelf && user && includeUserSelf;
+    const hasFriendsWithDevices = friendsWithDevices.length > 0;
+
+    if (hasSendToSelf || hasFriendsWithDevices) {
+      // Send to all selected recipients (including self if selected)
+      onSendToFriends(recipientFriendIds);
     } else {
       setSendError("Selected friends don't have any devices available.");
     }
@@ -235,11 +243,7 @@ export const FriendSelectorEnhanced: React.FC<FriendSelectorEnhancedProps> = ({
                     <p>{user.email} • For testing</p>
                   </IonLabel>
 
-                  <IonCheckbox
-                    slot="end"
-                    checked={sendToSelf}
-                    onIonChange={() => setSendToSelf(!sendToSelf)}
-                  />
+                  <IonCheckbox slot="end" checked={sendToSelf} />
                 </IonItem>
               )}
 
@@ -306,11 +310,7 @@ export const FriendSelectorEnhanced: React.FC<FriendSelectorEnhancedProps> = ({
                       </p>
                     </IonLabel>
 
-                    <IonCheckbox
-                      slot="end"
-                      checked={isSelected}
-                      onIonChange={() => toggleFriendSelection(friend.id)}
-                    />
+                    <IonCheckbox slot="end" checked={isSelected} />
                   </IonItem>
                 );
               })}

@@ -122,25 +122,14 @@ const SetupWizardModal: React.FC<SetupWizardModalProps> = ({
                     cable
                   </li>
                   <li>
-                    <strong>Wait for the LED</strong> to start blinking (about
-                    10 seconds)
+                    <strong>Wait a few seconds</strong> for the controller to
+                    boot up.
                   </li>
                   <li>
-                    <strong>Look for setup mode:</strong>
-                    <ul>
-                      <li>Blue blinking LED = Setup mode active</li>
-                      <li>
-                        Device creates WiFi network "PalPalette-Setup-XXXXXX"
-                      </li>
-                    </ul>
+                    <strong>Look for the access point:</strong> Device creates
+                    WiFi network "PalPalette-Setup-XXXXXX"
                   </li>
                 </ol>
-                <IonNote color="primary">
-                  <p>
-                    <strong>💡 Tip:</strong> If the LED doesn't blink, try
-                    pressing and holding the reset button for 5 seconds.
-                  </p>
-                </IonNote>
               </IonText>
             </IonCardContent>
           </IonCard>
@@ -227,8 +216,8 @@ const SetupWizardModal: React.FC<SetupWizardModalProps> = ({
           <IonCard>
             <IonCardHeader>
               <IonCardTitle>
-                <IonIcon icon={cloudDoneOutline} /> Step 4: Wait for Device
-                Online
+                <IonIcon icon={cloudDoneOutline} /> Step 4: Wait a few
+                seconds...
               </IonCardTitle>
             </IonCardHeader>
             <IonCardContent>
@@ -244,23 +233,8 @@ const SetupWizardModal: React.FC<SetupWizardModalProps> = ({
                   <li>Device connects to your WiFi ✓</li>
                   <li>Device registers with PalPalette servers ✓</li>
                   <li>Device generates a pairing code ✓</li>
+                  <li>After a few seconds you can proceed.</li>
                 </ul>
-                <p>
-                  <strong>LED Status:</strong>
-                </p>
-                <ul>
-                  <li>🔵 Blue blinking = Connecting to WiFi</li>
-                  <li>🟢 Green blinking = Connected, registering</li>
-                  <li>🟢 Green solid = Ready for pairing!</li>
-                </ul>
-                <IonNote color="success">
-                  <p>
-                    <strong>
-                      ✅ When the LED turns solid green, you're ready for the
-                      next step!
-                    </strong>
-                  </p>
-                </IonNote>
               </IonText>
             </IonCardContent>
           </IonCard>

@@ -227,10 +227,6 @@ const LightingConfigSimple: React.FC<LightingConfigSimpleProps> = ({
             transform: translateY(-2px);
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
           }
-          
-          .gradient-button {
-            background: linear-gradient(135deg, var(--ion-color-primary), var(--ion-color-secondary)) !important;
-          }
         `}
       </style>
       <IonModal isOpen={isOpen} onDidDismiss={handleClose}>
@@ -281,14 +277,14 @@ const LightingConfigSimple: React.FC<LightingConfigSimpleProps> = ({
                   margin: "0 0 8px 0",
                   fontSize: "28px",
                   fontWeight: "700",
-                  color: "var(--ion-color-dark)",
+                  color: "var(--ion-text-color)",
                 }}
               >
                 Configure Lighting
               </h2>
               <p
                 style={{
-                  color: "var(--ion-color-medium)",
+                  color: "var(--ion-color-step-600)",
                   fontSize: "16px",
                   lineHeight: "1.5",
                   margin: "0 auto",
@@ -339,7 +335,7 @@ const LightingConfigSimple: React.FC<LightingConfigSimpleProps> = ({
                       margin: "0 0 4px 0",
                       fontSize: "18px",
                       fontWeight: "600",
-                      color: "var(--ion-color-dark)",
+                      color: "var(--ion-text-color)",
                     }}
                   >
                     Device
@@ -348,7 +344,7 @@ const LightingConfigSimple: React.FC<LightingConfigSimpleProps> = ({
                     style={{
                       margin: "0",
                       fontSize: "15px",
-                      color: "var(--ion-color-medium)",
+                      color: "var(--ion-color-step-600)",
                     }}
                   >
                     {deviceName}
@@ -376,7 +372,7 @@ const LightingConfigSimple: React.FC<LightingConfigSimpleProps> = ({
                 style={{
                   fontSize: "20px",
                   fontWeight: "600",
-                  color: "var(--ion-color-dark)",
+                  color: "var(--ion-text-color)",
                   display: "flex",
                   alignItems: "center",
                   gap: "12px",
@@ -497,7 +493,7 @@ const LightingConfigSimple: React.FC<LightingConfigSimpleProps> = ({
                       style={{
                         margin: "0 0 12px 0",
                         fontSize: "15px",
-                        color: "var(--ion-color-dark)",
+                        color: "var(--ion-text-color)",
                         lineHeight: "1.4",
                       }}
                     >
@@ -553,10 +549,10 @@ const LightingConfigSimple: React.FC<LightingConfigSimpleProps> = ({
                 expand="block"
                 fill="outline"
                 size="large"
+                shape="round"
                 onClick={handleTestConnection}
                 disabled={!isFormValid() || testingConnection}
                 style={{
-                  "--border-radius": "16px",
                   height: "48px",
                   fontWeight: "600",
                 }}
@@ -577,11 +573,11 @@ const LightingConfigSimple: React.FC<LightingConfigSimpleProps> = ({
               <IonButton
                 expand="block"
                 size="large"
+                shape="round"
+                color="primary"
                 onClick={handleSave}
                 disabled={!isFormValid() || loading}
-                className="gradient-button"
                 style={{
-                  "--border-radius": "16px",
                   height: "48px",
                   fontWeight: "600",
                 }}
@@ -636,7 +632,7 @@ const LightingConfigSimple: React.FC<LightingConfigSimpleProps> = ({
                     margin: "0 0 8px 0",
                     fontSize: "18px",
                     fontWeight: "500",
-                    color: "var(--ion-color-medium)",
+                    color: "var(--ion-color-step-600)",
                   }}
                 >
                   Select a Lighting System
@@ -645,7 +641,7 @@ const LightingConfigSimple: React.FC<LightingConfigSimpleProps> = ({
                   style={{
                     margin: "0",
                     fontSize: "14px",
-                    color: "var(--ion-color-medium)",
+                    color: "var(--ion-color-step-600)",
                     lineHeight: "1.4",
                   }}
                 >

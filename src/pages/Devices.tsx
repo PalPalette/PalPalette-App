@@ -26,10 +26,12 @@ import {
   IonGrid,
   IonRow,
   IonCol,
+  IonToast,
 } from "@ionic/react";
 import { wifi, time, settings, bulb, add } from "ionicons/icons";
 import { useDevices } from "../hooks/useContexts";
 import { Device } from "../services/openapi/models/Device";
+import { LightingSystemService } from "../services/LightingSystemService";
 import {
   PairingCodeModal,
   DeviceSettingsModal,
@@ -53,6 +55,10 @@ const Devices: React.FC = () => {
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [authNotificationDevice, setAuthNotificationDevice] =
     useState<Device | null>(null);
+  const [testingLightingId, setTestingLightingId] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState("");
+  const [toastColor, setToastColor] = useState<"success" | "danger">("success");
+  const [showToast, setShowToast] = useState(false);
 
   // Remove the automatic refreshDevices call since DeviceProvider auto-fetches
   // useEffect(() => {
@@ -77,6 +83,30 @@ const Devices: React.FC = () => {
   const handleLightingConfig = (device: Device) => {
     setSelectedDevice(device);
     setShowLightingModal(true);
+  };
+
+  const handleTestLighting = async (device: Device) => {
+    setTestingLightingId(device.id);
+    try {
+      const result = await LightingSystemService.testLightingSystem(device.id);
+
+      if (result.testRequested && result.deviceConnected) {
+        setToastMessage(`${device.name} lighting test sent! ✨`);
+        setToastColor("success");
+      } else {
+        setToastMessage(
+          "Lighting test failed. Make sure the device is configured."
+        );
+        setToastColor("danger");
+      }
+    } catch (error) {
+      console.error("Lighting test error:", error);
+      setToastMessage("Failed to test lighting. Please try again.");
+      setToastColor("danger");
+    } finally {
+      setTestingLightingId(null);
+      setShowToast(true);
+    }
   };
 
   const handleDeviceReset = async (deviceId: string) => {
@@ -134,9 +164,14 @@ const Devices: React.FC = () => {
               <IonButton
                 fill="clear"
                 size="small"
-                onClick={() => handleLightingConfig(device)}
+                onClick={() => handleTestLighting(device)}
+                disabled={testingLightingId === device.id}
               >
-                <IonIcon icon={bulb} />
+                {testingLightingId === device.id ? (
+                  <IonSpinner name="crescent" />
+                ) : (
+                  <IonIcon icon={bulb} />
+                )}
               </IonButton>
               <IonButton
                 fill="clear"
@@ -301,6 +336,14 @@ const Devices: React.FC = () => {
             onFailed={handleAuthFailed}
           />
         )}
+
+        <IonToast
+          isOpen={showToast}
+          onDidDismiss={() => setShowToast(false)}
+          message={toastMessage}
+          duration={2000}
+          color={toastColor}
+        />
       </IonContent>
     </IonPage>
   );
