@@ -191,29 +191,11 @@ const PaletteCreator: React.FC = () => {
                   </IonSegment>
 
                   {creationMode === "photo" ? (
-                    <div>
-                      <IonIcon
-                        icon={camera}
-                        style={{
-                          fontSize: "64px",
-                          color: "var(--ion-color-primary)",
-                          marginBottom: "16px",
-                        }}
+                    <div style={{ marginTop: "16px" }}>
+                      <PhotoPicker
+                        onPaletteExtracted={handlePaletteExtracted}
+                        onError={(error) => showMessage(error, "danger")}
                       />
-                      <IonText>
-                        <h3>Extract from Photo</h3>
-                        <p>
-                          Take a photo or select one from your gallery to
-                          extract colors and send them to your friends' devices.
-                        </p>
-                      </IonText>
-
-                      <div style={{ marginTop: "24px" }}>
-                        <PhotoPicker
-                          onPaletteExtracted={handlePaletteExtracted}
-                          onError={(error) => showMessage(error, "danger")}
-                        />
-                      </div>
                     </div>
                   ) : (
                     <div>
@@ -334,7 +316,7 @@ const PaletteCreator: React.FC = () => {
                       onClick={() => setShowFriendSelector(true)}
                       disabled={isLoading}
                     >
-                      <IonIcon icon={send} slot="start" />
+                      <IonIcon slot="start" icon={send} />
                       Send to Friends
                     </IonButton>
                   </div>

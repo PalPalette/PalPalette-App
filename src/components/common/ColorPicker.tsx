@@ -38,6 +38,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
     null
   );
   const [pickerColor, setPickerColor] = useState("#FF5733");
+  const colorPickerRef = useRef<HTMLDivElement>(null);
 
   // Predefined color palette suggestions - more diverse and distinct colors
   const presetColors = [
@@ -142,6 +143,14 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
   const openColorPicker = (index: number) => {
     setEditingColorIndex(index);
     setPickerColor(colors[index]);
+
+    // Scroll to color picker after a short delay to ensure it's rendered
+    setTimeout(() => {
+      colorPickerRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+    }, 100);
   };
 
   const closeColorPicker = () => {
@@ -188,7 +197,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
 
           <div className="ion-text-center ion-margin-bottom">
             <IonButton fill="outline" onClick={handleShuffle}>
-              <IonIcon icon={shuffle} slot="start" />
+              <IonIcon slot="start" icon={shuffle} />
               Shuffle Colors
             </IonButton>
           </div>
@@ -284,6 +293,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
           {/* Inline Color Picker */}
           {editingColorIndex !== null && (
             <div
+              ref={colorPickerRef}
               style={{
                 marginTop: "20px",
                 padding: "16px",
@@ -364,7 +374,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
                   !isValidColor(customColor) || colors.includes(customColor)
                 }
               >
-                <IonIcon icon={add} />
+                <IonIcon slot="icon-only" icon={add} />
               </IonButton>
             </IonItem>
           </div>
